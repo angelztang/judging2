@@ -96,44 +96,34 @@ def add_judge():
 # Endpoint to submit a score to the database
 @app.route('/api/scores', methods=['POST'])
 def submit_score():
-    try:
-        data = request.get_json()
-        print("Received score data:", data)
-        
-        if not data or not all(key in data for key in ['judge_id', 'team_id', 'score']):
-            return jsonify({"error": "Missing required data"}), 400
-        
-        judge_id = data['judge_id']
-        team_id = data['team_id']
-        score = float(data['score'])
-        
-        if not (0 <= score <= 3):
-            return jsonify({"error": "Score must be between 0 and 3"}), 400
-        
-        # Use upsert to handle both insert and update efficiently
-        score_obj = Score.query.filter_by(judge_id=judge_id, team_id=team_id).first()
-        if score_obj:
-            score_obj.score = score
-        else:
-            score_obj = Score(judge_id=judge_id, team_id=team_id, score=score)
-            db.session.add(score_obj)
-        
-        db.session.commit()
-        
-        # Return the complete updated data
-        return jsonify({
-            "message": "Score submitted successfully!",
-            "score": {
-                "judge_id": judge_id,
-                "team_id": team_id,
-                "score": score
-            }
-        }), 201
+    data = request.json
+    judge = data.get('judge')
+    scores = data.get('scores')
     
+    # Validate scores
+    for team, score in scores.items():
+        try:
+            score_value = float(score)
+            if not (0 <= score_value <= 3):
+                return jsonify({'error': 'Scores must be between 0 and 3'}), 400
+        except (ValueError, TypeError):
+            return jsonify({'error': 'Invalid score format'}), 400
+    
+    # If validation passes, proceed with saving scores
+    for team, score in scores.items():
+        score_entry = Score(
+            judge_id=judge,
+            team_id=team,
+            score=float(score)
+        )
+        db.session.add(score_entry)
+    
+    try:
+        db.session.commit()
+        return jsonify({'message': 'Scores submitted successfully'}), 200
     except Exception as e:
-        print(f"Error submitting score: {e}")
         db.session.rollback()
-        return jsonify({"error": str(e)}), 500
+        return jsonify({'error': 'Failed to save scores'}), 500
 
 if __name__ == '__main__':
     app.run(debug=True)
