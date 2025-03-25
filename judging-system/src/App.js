@@ -152,21 +152,35 @@ function App() {
 
   const fetchScores = async () => {
     try {
+      console.log('Fetching scores from:', `${BACKEND_URL}/api/scores`);
       const response = await fetch(`${BACKEND_URL}/api/scores`);
+      
       if (!response.ok) {
-        throw new Error('Failed to fetch scores');
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
+      
       const data = await response.json();
+      console.log('Received scores data:', data);
+      
+      if (!Array.isArray(data)) {
+        throw new Error('Received invalid data format');
+      }
+
       setAllScores(data);
       
-      // Also update the judges list
+      // Update judges list
       const uniqueJudges = [...new Set(data.map(score => score.judge))];
       setJudges(uniqueJudges);
       
-      // Log for debugging
-      console.log('Fetched scores:', data);
+      // Update teams list if not already set
+      const uniqueTeams = [...new Set(data.map(score => score.team))];
+      if (uniqueTeams.length > 0) {
+        setTeams(uniqueTeams);
+      }
     } catch (error) {
       console.error('Error fetching scores:', error);
+      setAllScores([]);  // Set empty array on error
+      alert('Error loading data. Please refresh the page.');
     }
   };
 
@@ -219,10 +233,16 @@ function App() {
     }
   };
 
-  // Add useEffect to fetch scores when component mounts
+  // Make sure we're fetching data when component mounts
   useEffect(() => {
     fetchScores();
-  }, []); // Empty dependency array means this runs once when component mounts
+    
+    // Set up periodic refresh every 30 seconds
+    const interval = setInterval(fetchScores, 30000);
+    
+    // Cleanup interval on unmount
+    return () => clearInterval(interval);
+  }, []);
 
   // Add this for debugging
   useEffect(() => {
@@ -236,6 +256,64 @@ function App() {
     if (scores.length === 0) return "";
     const sum = scores.reduce((a, b) => a + b, 0);
     return (sum / scores.length).toFixed(2);
+  };
+
+  // Add error boundary for the table component
+  const renderScoresTable = () => {
+    try {
+      if (!allScores || allScores.length === 0) {
+        return <p>No scores available. Please submit some scores.</p>;
+      }
+
+      return (
+        <div className="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th style={tableHeaderStyle}>Team</th>
+                {judges.map(judge => (
+                  <th key={judge} style={tableHeaderStyle}>{judge}</th>
+                ))}
+                <th style={{
+                  ...tableHeaderStyle,
+                  position: 'sticky',
+                  right: 0,
+                  zIndex: 1
+                }}>Average</th>
+              </tr>
+            </thead>
+            <tbody>
+              {teams.map(team => {
+                const teamScores = scoreTableData[team] || {};
+                const average = calculateAverage(teamScores);
+                
+                return (
+                  <tr key={team}>
+                    <td style={tableCellStyle}>{team}</td>
+                    {judges.map(judge => (
+                      <td key={`${team}-${judge}`} style={tableCellStyle}>
+                        {teamScores[judge] !== undefined ? teamScores[judge] : ""}
+                      </td>
+                    ))}
+                    <td style={{
+                      ...tableCellStyle,
+                      position: 'sticky',
+                      right: 0,
+                      background: 'white',
+                      fontWeight: 'bold',
+                      color: '#2c5282'
+                    }}>{average}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      );
+    } catch (error) {
+      console.error('Error rendering table:', error);
+      return <p>Error displaying scores. Please refresh the page.</p>;
+    }
   };
 
   return (
@@ -286,57 +364,7 @@ function App() {
           )}
 
           <h2>Score Table</h2>
-          <div className="table-container" style={{
-            overflowX: 'auto',
-            maxWidth: '100%',
-            marginTop: '20px'
-          }}>
-            <table style={{ 
-              width: '100%',
-              borderCollapse: 'collapse',
-              whiteSpace: 'nowrap'
-            }}>
-              <thead>
-                <tr>
-                  <th style={tableHeaderStyle}>Team</th>
-                  {judges.map(judge => (
-                    <th key={judge} style={tableHeaderStyle}>{judge}</th>
-                  ))}
-                  <th style={{
-                    ...tableHeaderStyle,
-                    position: 'sticky',
-                    right: 0,
-                    zIndex: 1
-                  }}>Average</th>
-                </tr>
-              </thead>
-              <tbody>
-                {teams.map(team => {
-                  const teamScores = scoreTableData[team] || {};
-                  const average = calculateAverage(teamScores);
-                  
-                  return (
-                    <tr key={team}>
-                      <td style={tableCellStyle}>{team}</td>
-                      {judges.map(judge => (
-                        <td key={`${team}-${judge}`} style={tableCellStyle}>
-                          {teamScores[judge] !== undefined ? teamScores[judge] : ""}
-                        </td>
-                      ))}
-                      <td style={{
-                        ...tableCellStyle,
-                        position: 'sticky',
-                        right: 0,
-                        background: 'white',
-                        fontWeight: 'bold',
-                        color: '#2c5282'
-                      }}>{average}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          {renderScoresTable()}
         </>
       )}
     </div>

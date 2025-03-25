@@ -49,16 +49,27 @@ def serve(path):
 def get_scores():
     try:
         scores = Score.query.all()
-        return jsonify([{
-            'id': score.id,
-            'judge': score.judge_id,
-            'team': score.team_id,
-            'score': float(score.score),  # Ensure score is converted to float
-            'timestamp': score.timestamp.isoformat() if score.timestamp else None
-        } for score in scores])
+        scores_list = []
+        for score in scores:
+            try:
+                score_dict = {
+                    'id': score.id,
+                    'judge': score.judge_id,
+                    'team': score.team_id,
+                    'score': float(score.score),
+                    'timestamp': score.timestamp.isoformat() if score.timestamp else None
+                }
+                scores_list.append(score_dict)
+            except Exception as e:
+                print(f"Error processing score {score.id}: {str(e)}")
+                continue
+        
+        print(f"Returning {len(scores_list)} scores")  # Debug log
+        return jsonify(scores_list)
+    
     except Exception as e:
-        print(f"Error fetching scores: {str(e)}")  # Add logging
-        return jsonify({'error': 'Failed to fetch scores'}), 500
+        print(f"Error in get_scores: {str(e)}")  # Debug log
+        return jsonify({'error': str(e)}), 500
 
 # Endpoint to get all unique judges
 @app.route('/api/judges', methods=['GET'])
@@ -105,33 +116,46 @@ def add_judge():
 def submit_score():
     try:
         data = request.json
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+            
+        print(f"Received score submission: {data}")  # Debug log
+        
         judge = data.get('judge')
         scores = data.get('scores')
         
-        # Validate scores
+        if not judge or not scores:
+            return jsonify({'error': 'Missing judge or scores'}), 400
+            
+        # Process and save scores...
         for team, score in scores.items():
             try:
                 score_value = float(score)
                 if not (0 <= score_value <= 3):
-                    return jsonify({'error': 'Scores must be between 0 and 3'}), 400
-            except (ValueError, TypeError):
-                return jsonify({'error': 'Invalid score format'}), 400
-        
-        # If validation passes, proceed with saving scores
-        for team, score in scores.items():
-            score_entry = Score(
-                judge_id=judge,
-                team_id=team,
-                score=float(score)
-            )
-            db.session.add(score_entry)
-        
+                    return jsonify({'error': f'Invalid score {score_value} for team {team}'}), 400
+                    
+                score_entry = Score(
+                    judge_id=judge,
+                    team_id=team,
+                    score=score_value
+                )
+                db.session.add(score_entry)
+            except ValueError:
+                return jsonify({'error': f'Invalid score format for team {team}'}), 400
+                
         db.session.commit()
+        print("Scores saved successfully")  # Debug log
         return jsonify({'message': 'Scores submitted successfully'}), 200
+        
     except Exception as e:
         db.session.rollback()
-        print(f"Error submitting scores: {str(e)}")  # Add logging
-        return jsonify({'error': 'Failed to save scores'}), 500
+        print(f"Error in submit_score: {str(e)}")  # Debug log
+        return jsonify({'error': str(e)}), 500
+
+# Add a health check endpoint
+@app.route('/api/health', methods=['GET'])
+def health_check():
+    return jsonify({'status': 'healthy'}), 200
 
 if __name__ == '__main__':
     app.run(debug=True)
