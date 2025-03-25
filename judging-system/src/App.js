@@ -31,6 +31,8 @@ function App() {
   const [seenTeamsByJudge, setSeenTeamsByJudge] = useState({});
   const [scoreTableData, setScoreTableData] = useState({});
   const [isLoading, setIsLoading] = useState(true);
+  const [allScores, setAllScores] = useState([]);
+  const [scores, setScores] = useState({});
 
   // Load initial data
   useEffect(() => {
@@ -139,87 +141,94 @@ function App() {
     }
   };
 
-  const handleScoreChange = (index, value) => {
-    setScoresByJudge(prev => ({
-      ...prev,
-      [currentJudge]: prev[currentJudge].map((score, i) => 
-        i === index ? value : score
-      )
-    }));
+  const handleScoreChange = (team, value) => {
+    // Allow empty string or valid numbers
+    if (value === "" || (!isNaN(value) && value >= 0 && value <= 3)) {
+      setScores(prev => ({ ...prev, [team]: value }));
+    } else {
+      alert("Please enter a score between 0 and 3");
+    }
   };
 
-  const handleSubmit = async () => {
-    if (!currentJudge || scoresByJudge[currentJudge].some(score => score === "")) {
-      alert("Please enter all scores before submitting.");
+  const fetchScores = async () => {
+    try {
+      const response = await fetch(`${BACKEND_URL}/api/scores`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch scores');
+      }
+      const data = await response.json();
+      setAllScores(data);
+      
+      // Also update the judges list
+      const uniqueJudges = [...new Set(data.map(score => score.judge))];
+      setJudges(uniqueJudges);
+      
+      // Log for debugging
+      console.log('Fetched scores:', data);
+    } catch (error) {
+      console.error('Error fetching scores:', error);
+    }
+  };
+
+  const handleScoreSubmit = async (e) => {
+    e.preventDefault();
+    
+    // Check if we have scores for all teams
+    const missingTeams = teams.filter(team => !scores[team] && scores[team] !== 0);
+    if (missingTeams.length > 0) {
+      alert(`Please submit scores for all teams. Missing: ${missingTeams.join(', ')}`);
       return;
     }
 
-    try {
-      // Submit scores and update table immediately
-      const currentTeams = currentTeamsByJudge[currentJudge];
-      const currentScores = scoresByJudge[currentJudge];
-      
-      for (let i = 0; i < currentTeams.length; i++) {
-        const team = currentTeams[i];
-        const score = parseFloat(currentScores[i]);
-        
-        try {
-          // Submit to backend
-          const response = await fetch(`${BACKEND_URL}/api/scores`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              judge_id: currentJudge,
-              team_id: team,
-              score: score
-            })
-          });
-
-          if (!response.ok) {
-            console.warn(`Warning: Failed to submit score for ${team}, continuing with other scores`);
-            continue; // Continue with other scores even if one fails
-          }
-
-          // Update the score table immediately for each successful score
-          setScoreTableData(prev => ({
-            ...prev,
-            [team]: {
-              ...(prev[team] || {}),
-              [currentJudge]: score
-            }
-          }));
-        } catch (error) {
-          console.warn(`Warning: Error submitting score for ${team}:`, error);
-          continue; // Continue with other scores even if one fails
-        }
+    // Validate score range
+    for (const team in scores) {
+      const score = parseFloat(scores[team]);
+      if (isNaN(score) || score < 0 || score > 3) {
+        alert("Please submit scores within the range of 0-3 for all teams");
+        return;
       }
+    }
 
-      // Update seen teams (only add teams that weren't previously seen)
-      setSeenTeamsByJudge(prev => {
-        const prevTeams = new Set(prev[currentJudge] || []);
-        const newTeams = currentTeams.filter(team => !prevTeams.has(team));
-        return {
-          ...prev,
-          [currentJudge]: [...prevTeams, ...newTeams]
-        };
+    try {
+      // Log for debugging
+      console.log('Submitting scores:', scores);
+      console.log('Selected judge:', currentJudge);
+
+      const response = await fetch(`${BACKEND_URL}/api/scores`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          judge: currentJudge,
+          scores: scores
+        }),
       });
 
-      // Assign new teams, excluding current teams to avoid duplicates
-      const newTeams = getWeightedRandomTeams(
-        teams, 
-        seenTeamsByJudge[currentJudge] || [], 
-        5
-      );
-      setCurrentTeamsByJudge(prev => ({ ...prev, [currentJudge]: newTeams }));
-      setScoresByJudge(prev => ({ ...prev, [currentJudge]: Array(5).fill("") }));
-
-      alert('Scores submitted successfully!');
+      if (response.ok) {
+        alert('Scores submitted successfully!');
+        setScores({});
+        await fetchScores();
+      } else {
+        const errorData = await response.json();
+        alert(`Failed to submit scores: ${errorData.error || 'Please try again'}`);
+      }
     } catch (error) {
-      console.error("Error submitting scores:", error);
-      alert('Some scores may not have been submitted. Please check the score table.');
-      // Don't freeze - still allow continuing
+      console.error('Error submitting scores:', error);
+      alert('Error submitting scores. Please try again.');
     }
   };
+
+  // Add useEffect to fetch scores when component mounts
+  useEffect(() => {
+    fetchScores();
+  }, []); // Empty dependency array means this runs once when component mounts
+
+  // Add this for debugging
+  useEffect(() => {
+    console.log('Current scores state:', scores);
+    console.log('Teams:', teams);
+  }, [scores, teams]);
 
   // Add or update the average calculation function
   const calculateAverage = (teamScores) => {
@@ -264,14 +273,14 @@ function App() {
                   max="3"
                   placeholder="Score (0-3)"
                   value={scoresByJudge[currentJudge]?.[index] || ""}
-                  onChange={(e) => handleScoreChange(index, e.target.value)}
+                  onChange={(e) => handleScoreChange(team, e.target.value)}
                 />
               </div>
             ))}
           </div>
 
           {currentJudge && (
-            <button onClick={handleSubmit} className="submit-btn">
+            <button onClick={handleScoreSubmit} className="submit-btn">
               Submit Scores
             </button>
           )}
