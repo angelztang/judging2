@@ -76,16 +76,16 @@ def submit_score():
         # Check if score already exists
         existing_score = Score.query.filter_by(judge_id=judge_id, team_id=team_id).first()
         if existing_score:
-            return jsonify({"error": "Score already exists for this judge and team"}), 409
-        
-        # Create a new Score object
-        new_score = Score(judge_id=judge_id, team_id=team_id, score=score)
-        
-        # Add the score to the database
-        db.session.add(new_score)
-        db.session.commit()
-        
-        return jsonify({"message": "Score submitted successfully!"}), 201
+            # Update existing score
+            existing_score.score = score
+            db.session.commit()
+            return jsonify({"message": "Score updated successfully!"}), 200
+        else:
+            # Create a new Score object
+            new_score = Score(judge_id=judge_id, team_id=team_id, score=score)
+            db.session.add(new_score)
+            db.session.commit()
+            return jsonify({"message": "Score submitted successfully!"}), 201
         
     except ValueError:
         return jsonify({"error": "Invalid score value"}), 400

@@ -98,11 +98,11 @@ function App() {
     // Validate scores
     const invalidScores = currentScores.some(score => {
       const numScore = parseFloat(score);
-      return isNaN(numScore) || numScore < 0 || numScore > 10;
+      return isNaN(numScore) || numScore < 0 || numScore > 3;
     });
 
     if (invalidScores) {
-      alert('Please enter valid scores between 0 and 10 for all teams');
+      alert('Please enter valid scores between 0 and 3 for all teams');
       return;
     }
 
@@ -115,28 +115,25 @@ function App() {
 
       console.log('Submitting scores:', newData);
       
-      // Submit all scores and track results
-      const results = await Promise.all(newData.map(submitScore));
-      const successfulSubmissions = results.filter(Boolean).length;
+      // Submit all scores
+      await Promise.all(newData.map(submitScore));
       
       // Fetch updated scores from the backend
       await fetchScores();
 
-      setSeenTeamsByJudge((prev) => ({
+      // Update seen teams for this judge
+      setSeenTeamsByJudge(prev => ({
         ...prev,
-        [currentJudge]: [...(prev[currentJudge] || []), ...currentTeams],
+        [currentJudge]: [...new Set([...(prev[currentJudge] || []), ...currentTeams])]
       }));
 
+      // Assign new teams to judge
       assignNewTeams(currentJudge);
       
-      if (successfulSubmissions === newData.length) {
-        alert('All scores submitted successfully!');
-      } else {
-        alert(`${successfulSubmissions} new scores submitted. Some scores were already in the system and were not updated.`);
-      }
+      alert('All scores submitted successfully!');
     } catch (error) {
       console.error('Error submitting scores:', error);
-      alert('Failed to submit some scores. Please try again. Error: ' + error.message);
+      alert('Failed to submit scores. Please try again. Error: ' + error.message);
     }
   };
 
@@ -164,42 +161,33 @@ function App() {
       const data = await response.json();
       console.log("Received scores:", data);
 
-      // Extract unique judges and teams from the data
-      const uniqueJudges = new Set(data.map(score => score.judge_id));
-      const uniqueTeams = new Set(data.map(score => score.team_id));
-      console.log("Found judges:", Array.from(uniqueJudges));
-      console.log("Found teams:", Array.from(uniqueTeams));
+      // Extract unique judges from the data
+      const uniqueJudges = [...new Set(data.map(score => score.judge_id))];
+      console.log("Found judges:", uniqueJudges);
 
-      // Update judges list with all judges from database
-      const allJudges = Array.from(uniqueJudges);
-      console.log("Setting judges to:", allJudges);
-      setJudges(allJudges);
+      // Update judges list
+      setJudges(uniqueJudges);
 
       // Initialize score table with all teams
       const updatedData = {};
       teams.forEach(team => {
         updatedData[team] = {};
-        allJudges.forEach(judge => {
-          updatedData[team][judge] = ""; // Initialize all scores as empty string
+        uniqueJudges.forEach(judge => {
+          updatedData[team][judge] = ""; // Initialize with empty string
         });
       });
 
-      // Fill in the actual scores from the database
-      data.forEach((scoreEntry) => {
-        const { team_id, judge_id, score } = scoreEntry;
+      // Fill in actual scores
+      data.forEach(({ team_id, judge_id, score }) => {
         updatedData[team_id][judge_id] = score;
       });
-      
+
       console.log("Updated score table data:", updatedData);
       setScoreTableData(updatedData);
 
-      // Update judged teams set
-      setJudgedTeams(new Set(Array.from(uniqueTeams)));
-
       // Update seen teams for each judge
       const seenTeamsByJudgeData = {};
-      data.forEach((scoreEntry) => {
-        const { team_id, judge_id } = scoreEntry;
+      data.forEach(({ team_id, judge_id }) => {
         if (!seenTeamsByJudgeData[judge_id]) {
           seenTeamsByJudgeData[judge_id] = [];
         }
@@ -209,8 +197,7 @@ function App() {
 
       // Update team assignments
       const teamAssignmentsData = {};
-      data.forEach((scoreEntry) => {
-        const { team_id } = scoreEntry;
+      data.forEach(({ team_id }) => {
         teamAssignmentsData[team_id] = (teamAssignmentsData[team_id] || 0) + 1;
       });
       setTeamAssignments(teamAssignmentsData);
@@ -246,7 +233,10 @@ function App() {
             <span>{team}</span>
             <input
               type="number"
-              placeholder="Enter score"
+              min="0"
+              max="3"
+              step="0.1"
+              placeholder="Enter score (0-3)"
               value={scoresByJudge[currentJudge]?.[index] || ""}
               onChange={(e) => handleScoreChange(index, e.target.value)}
             />
@@ -254,9 +244,14 @@ function App() {
         ))}
       </div>
 
-      <button onClick={handleSubmit} className="submit-btn">
-        Submit Scores
-      </button>
+      {currentJudge && currentTeamsByJudge[currentJudge]?.length > 0 && (
+        <button 
+          onClick={handleSubmit} 
+          className="submit-btn"
+        >
+          Submit Scores
+        </button>
+      )}
 
       <h2>Score Table</h2>
       <div className="table-container">
@@ -271,23 +266,26 @@ function App() {
             </tr>
           </thead>
           <tbody>
-            {Object.entries(scoreTableData)
-              .sort(([teamA], [teamB]) => {
-                const numA = parseInt(teamA.split(' ')[1]);
-                const numB = parseInt(teamB.split(' ')[1]);
+            {teams
+              .sort((a, b) => {
+                const numA = parseInt(a.split(' ')[1]);
+                const numB = parseInt(b.split(' ')[1]);
                 return numA - numB;
               })
-              .map(([team, teamScores]) => (
-                <tr key={team}>
-                  <td>{team}</td>
-                  {judges.map((judge) => (
-                    <td key={`${team}-${judge}`}>
-                      {teamScores[judge] !== null ? teamScores[judge] : ""}
-                    </td>
-                  ))}
-                  <td>{calculateAverage(teamScores)}</td>
-                </tr>
-              ))}
+              .map(team => {
+                const teamScores = scoreTableData[team] || {};
+                return (
+                  <tr key={team}>
+                    <td>{team}</td>
+                    {judges.map((judge) => (
+                      <td key={`${team}-${judge}`}>
+                        {teamScores[judge] || ""}
+                      </td>
+                    ))}
+                    <td>{calculateAverage(teamScores)}</td>
+                  </tr>
+                );
+              })}
           </tbody>
         </table>
       </div>
@@ -316,13 +314,13 @@ const submitScore = async (scoreData) => {
     console.log("Response status:", response.status);
     console.log("Response text:", responseText);
 
-    // Consider both 201 (Created) and 200 (OK, duplicate) as success
-    if (response.status !== 201 && response.status !== 200) {
-      throw new Error(`Failed to submit score: ${responseText}`);
+    // Both 201 (Created) and 200 (Updated) are successful responses
+    if (response.status === 201 || response.status === 200) {
+      console.log("Score submitted/updated successfully!");
+      return true;
     }
 
-    console.log("Score submitted successfully!");
-    return true;
+    throw new Error(`Failed to submit score: ${responseText}`);
   } catch (error) {
     console.error("Error submitting score:", error);
     console.error("Error details:", error.message);
