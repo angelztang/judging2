@@ -280,9 +280,6 @@ function App() {
           <div className="table-container" style={{
             overflowX: 'auto',
             maxWidth: '100%',
-            backgroundColor: '#f5f5f5',
-            padding: '15px',
-            borderRadius: '5px',
             marginTop: '20px'
           }}>
             <table style={{ 
@@ -298,8 +295,6 @@ function App() {
                   ))}
                   <th style={{
                     ...tableHeaderStyle,
-                    backgroundColor: '#4CAF50',
-                    color: 'white',
                     position: 'sticky',
                     right: 0,
                     zIndex: 1
@@ -321,10 +316,11 @@ function App() {
                       ))}
                       <td style={{
                         ...tableCellStyle,
-                        backgroundColor: '#f9f9f9',
                         position: 'sticky',
                         right: 0,
-                        fontWeight: 'bold'
+                        background: 'white',
+                        fontWeight: 'bold',
+                        color: '#2c5282'
                       }}>{average}</td>
                     </tr>
                   );
@@ -338,21 +334,19 @@ function App() {
   );
 }
 
-// Add these styles
+// Simplified styles
 const tableHeaderStyle = {
-  padding: '12px 15px',
+  padding: '8px 15px',
   textAlign: 'center',
-  backgroundColor: '#4a90e2',
-  color: 'white',
-  position: 'sticky',
-  top: 0,
-  zIndex: 1
+  background: 'white',
+  color: '#2c5282'
 };
 
 const tableCellStyle = {
   padding: '8px 15px',
   textAlign: 'center',
-  borderBottom: '1px solid #ddd'
+  borderBottom: '1px solid #ddd',
+  color: '#2c5282'
 };
 
 // Add some CSS to your App1.css file
