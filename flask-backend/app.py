@@ -12,7 +12,7 @@ app = Flask(__name__)
 CORS(app)  # This will allow cross-origin requests from your React app
 
 # Configure the database
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ['DATABASE_URL']  # Heroku provides this as an environment variable
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ['DATABASE_URL'].replace('postgres', 'postgresql+psycopg2') # Heroku provides this as an environment variable
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False  # Disable unnecessary tracking
 db = SQLAlchemy(app)
 
@@ -67,3 +67,35 @@ def submit_score():
 
 if __name__ == '__main__':
     app.run(debug=True)
+
+# from flask import Flask, request, jsonify
+# from flask_sqlalchemy import SQLAlchemy
+# import os
+# from dotenv import load_dotenv
+
+# load_dotenv()
+# print(os.environ.get('DATABASE_URL'))
+
+# app = Flask(__name__)
+
+# # Set up the database URL
+# app.config['SQLALCHEMY_DATABASE_URI'] = os.environ['DATABASE_URL'].replace('postgres', 'postgresql+psycopg2')
+# app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+# db = SQLAlchemy(app)
+
+# # Define your model
+# class Score(db.Model):
+#     id = db.Column(db.Integer, primary_key=True)
+#     judge_id = db.Column(db.String(80), nullable=False)
+#     team_id = db.Column(db.String(80), nullable=False)
+#     score = db.Column(db.Float, nullable=False)
+
+# @app.route('/scores', methods=['GET'])
+# def get_scores():
+#     scores = Score.query.all()
+#     return jsonify([score.to_dict() for score in scores])
+
+# if __name__ == '__main__':
+#     app.run(debug=True)
+
