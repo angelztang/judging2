@@ -28,6 +28,7 @@ class Score(db.Model):
     judge_id = db.Column(db.String(80), nullable=False, index=True)
     team_id = db.Column(db.String(80), nullable=False, index=True)
     score = db.Column(db.Float, nullable=False)
+    timestamp = db.Column(db.DateTime, default=db.func.current_timestamp())
     
     # Add unique constraint to prevent duplicate scores
     __table_args__ = (
@@ -48,10 +49,16 @@ def serve(path):
 def get_scores():
     try:
         scores = Score.query.all()
-        scores_data = [{"judge_id": score.judge_id, "team_id": score.team_id, "score": score.score} for score in scores]
-        return jsonify(scores_data)
+        return jsonify([{
+            'id': score.id,
+            'judge': score.judge_id,
+            'team': score.team_id,
+            'score': float(score.score),  # Ensure score is converted to float
+            'timestamp': score.timestamp.isoformat() if score.timestamp else None
+        } for score in scores])
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        print(f"Error fetching scores: {str(e)}")  # Add logging
+        return jsonify({'error': 'Failed to fetch scores'}), 500
 
 # Endpoint to get all unique judges
 @app.route('/api/judges', methods=['GET'])
@@ -96,33 +103,34 @@ def add_judge():
 # Endpoint to submit a score to the database
 @app.route('/api/scores', methods=['POST'])
 def submit_score():
-    data = request.json
-    judge = data.get('judge')
-    scores = data.get('scores')
-    
-    # Validate scores
-    for team, score in scores.items():
-        try:
-            score_value = float(score)
-            if not (0 <= score_value <= 3):
-                return jsonify({'error': 'Scores must be between 0 and 3'}), 400
-        except (ValueError, TypeError):
-            return jsonify({'error': 'Invalid score format'}), 400
-    
-    # If validation passes, proceed with saving scores
-    for team, score in scores.items():
-        score_entry = Score(
-            judge_id=judge,
-            team_id=team,
-            score=float(score)
-        )
-        db.session.add(score_entry)
-    
     try:
+        data = request.json
+        judge = data.get('judge')
+        scores = data.get('scores')
+        
+        # Validate scores
+        for team, score in scores.items():
+            try:
+                score_value = float(score)
+                if not (0 <= score_value <= 3):
+                    return jsonify({'error': 'Scores must be between 0 and 3'}), 400
+            except (ValueError, TypeError):
+                return jsonify({'error': 'Invalid score format'}), 400
+        
+        # If validation passes, proceed with saving scores
+        for team, score in scores.items():
+            score_entry = Score(
+                judge_id=judge,
+                team_id=team,
+                score=float(score)
+            )
+            db.session.add(score_entry)
+        
         db.session.commit()
         return jsonify({'message': 'Scores submitted successfully'}), 200
     except Exception as e:
         db.session.rollback()
+        print(f"Error submitting scores: {str(e)}")  # Add logging
         return jsonify({'error': 'Failed to save scores'}), 500
 
 if __name__ == '__main__':
