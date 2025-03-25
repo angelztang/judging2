@@ -143,9 +143,13 @@ function App() {
   const handleJudgeChange = (event) => {
     const selectedJudge = event.target.value;
     console.log('Selected judge:', selectedJudge);
+    
+    // Force immediate update of current judge
     setCurrentJudge(selectedJudge);
     
-    if (selectedJudge && !currentTeamsByJudge[selectedJudge]) {
+    // Ensure teams are assigned for the selected judge
+    if (selectedJudge) {
+      console.log('Assigning teams for judge:', selectedJudge);
       assignNewTeams(selectedJudge);
     }
   };
@@ -155,6 +159,15 @@ function App() {
     if (newJudge && !judges.includes(newJudge)) {
       try {
         console.log('Adding new judge:', newJudge);
+        
+        // Update local state immediately for instant feedback
+        setJudges(prev => [...prev, newJudge]);
+        setCurrentJudge(newJudge);
+        
+        // Initialize empty data structures for the new judge
+        setCurrentTeamsByJudge(prev => ({ ...prev, [newJudge]: [] }));
+        setScoresByJudge(prev => ({ ...prev, [newJudge]: [] }));
+        setSeenTeamsByJudge(prev => ({ ...prev, [newJudge]: [] }));
         
         // Create initial score to persist the judge
         const initialScore = {
@@ -177,24 +190,18 @@ function App() {
           throw new Error(error.error || 'Failed to add judge');
         }
 
-        // Add the judge to the frontend state
-        setJudges(prev => [...prev, newJudge]);
-        setCurrentJudge(newJudge);
-        
-        // Initialize empty data structures for the new judge
-        setCurrentTeamsByJudge(prev => ({ ...prev, [newJudge]: [] }));
-        setScoresByJudge(prev => ({ ...prev, [newJudge]: [] }));
-        setSeenTeamsByJudge(prev => ({ ...prev, [newJudge]: [] }));
+        // Assign teams for the new judge
+        assignNewTeams(newJudge);
         
         // Fetch latest data to ensure everything is in sync
         await fetchScores();
         
-        // Then assign new teams
-        assignNewTeams(newJudge);
-        
         alert('Judge added successfully!');
       } catch (error) {
         console.error('Error adding new judge:', error);
+        // Remove the judge from local state if the server request failed
+        setJudges(prev => prev.filter(j => j !== newJudge));
+        setCurrentJudge("");
         alert('Failed to add new judge: ' + error.message);
       }
     }
@@ -343,7 +350,11 @@ function App() {
         <>
           <div className="select-container">
             <label>Select Judge: </label>
-            <select value={currentJudge} onChange={handleJudgeChange}>
+            <select 
+              value={currentJudge} 
+              onChange={handleJudgeChange}
+              style={{ minWidth: '200px' }}  // Add some minimum width
+            >
               <option value="">Select a judge</option>
               {judges.map((judge) => (
                 <option key={judge} value={judge}>
@@ -351,10 +362,21 @@ function App() {
                 </option>
               ))}
             </select>
-            <button onClick={addNewJudge} className="add-judge-btn">
+            <button 
+              onClick={addNewJudge} 
+              className="add-judge-btn"
+              style={{ marginLeft: '10px' }}  // Add some spacing
+            >
               + Add New Judge
             </button>
           </div>
+
+          {/* Show current judge for confirmation */}
+          {currentJudge && (
+            <div style={{ margin: '10px 0', fontWeight: 'bold' }}>
+              Current Judge: {currentJudge}
+            </div>
+          )}
 
           <div className="team-inputs">
             {(currentTeamsByJudge[currentJudge] || []).map((team, index) => (
