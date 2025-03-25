@@ -3,6 +3,7 @@ from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 import os
 from dotenv import load_dotenv
+import psycopg2
 
 # Load environment variables from the .env file
 load_dotenv()
@@ -14,6 +15,12 @@ CORS(app)  # This will allow cross-origin requests from your React app
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ['DATABASE_URL']  # Heroku provides this as an environment variable
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False  # Disable unnecessary tracking
 db = SQLAlchemy(app)
+
+DATABASE_URL = os.environ['DATABASE_URL']
+
+def get_db_connection():
+    conn = psycopg2.connect(DATABASE_URL, sslmode='require')
+    return conn
 
 # Score model
 class Score(db.Model):
