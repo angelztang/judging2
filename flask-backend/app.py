@@ -77,11 +77,13 @@ def submit_score():
         existing_score = Score.query.filter_by(judge_id=judge_id, team_id=team_id).first()
         if existing_score:
             # Update existing score
+            print(f"Updating score for judge {judge_id} team {team_id} from {existing_score.score} to {score}")
             existing_score.score = score
             db.session.commit()
             return jsonify({"message": "Score updated successfully!"}), 200
         else:
             # Create a new Score object
+            print(f"Creating new score for judge {judge_id} team {team_id}: {score}")
             new_score = Score(judge_id=judge_id, team_id=team_id, score=score)
             db.session.add(new_score)
             db.session.commit()

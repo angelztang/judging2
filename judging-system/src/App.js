@@ -34,7 +34,71 @@ function App() {
   const [seenTeamsByJudge, setSeenTeamsByJudge] = useState({});
   const [scoreTableData, setScoreTableData] = useState({});
   const [teamAssignments, setTeamAssignments] = useState({});
-  const [judgedTeams, setJudgedTeams] = useState(new Set()); // Track judged teams
+  const [judgedTeams, setJudgedTeams] = useState(new Set());
+
+  // Initialize data on mount
+  useEffect(() => {
+    const initializeData = async () => {
+      try {
+        console.log("Initializing data...");
+        const response = await fetch(`${BACKEND_URL}/api/scores`);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch scores: ${await response.text()}`);
+        }
+        const data = await response.json();
+        console.log("Received initial data:", data);
+
+        // Extract and set judges immediately
+        const uniqueJudges = [...new Set(data.map(score => score.judge_id))].sort();
+        console.log("Setting initial judges:", uniqueJudges);
+        setJudges(uniqueJudges);
+
+        // Initialize score table
+        const updatedData = {};
+        teams.forEach(team => {
+          updatedData[team] = {};
+          uniqueJudges.forEach(judge => {
+            updatedData[team][judge] = "";
+          });
+        });
+
+        // Fill in scores
+        data.forEach(({ team_id, judge_id, score }) => {
+          if (!updatedData[team_id]) {
+            updatedData[team_id] = {};
+          }
+          updatedData[team_id][judge_id] = score;
+        });
+
+        setScoreTableData(updatedData);
+
+        // Set seen teams
+        const seenTeams = {};
+        uniqueJudges.forEach(judge => {
+          seenTeams[judge] = data
+            .filter(score => score.judge_id === judge)
+            .map(score => score.team_id);
+        });
+        setSeenTeamsByJudge(seenTeams);
+
+        // Set team assignments
+        const assignments = {};
+        data.forEach(({ team_id }) => {
+          assignments[team_id] = (assignments[team_id] || 0) + 1;
+        });
+        setTeamAssignments(assignments);
+
+        // Set judged teams
+        setJudgedTeams(new Set(data.map(score => score.team_id)));
+
+      } catch (error) {
+        console.error("Error initializing data:", error);
+        alert("Failed to load initial data. Please refresh the page.");
+      }
+    };
+
+    initializeData();
+  }, []);
 
   useEffect(() => {
     if (currentJudge && !currentTeamsByJudge[currentJudge]) {
@@ -146,12 +210,6 @@ function App() {
     return numJudges > 0 ? (totalScore / numJudges).toFixed(2) : "";
   };
 
-  // Fetch scores when component mounts
-  useEffect(() => {
-    console.log("Initial mount - fetching scores");
-    fetchScores();
-  }, []);
-
   const fetchScores = async () => {
     try {
       console.log("Fetching scores from:", `${BACKEND_URL}/api/scores`);
@@ -220,15 +278,11 @@ function App() {
         <label>Select Judge: </label>
         <select value={currentJudge} onChange={handleJudgeChange}>
           <option value="">Select a judge</option>
-          {judges.length > 0 ? (
-            judges.map((judge) => (
-              <option key={judge} value={judge}>
-                {judge}
-              </option>
-            ))
-          ) : (
-            <option value="" disabled>No judges yet</option>
-          )}
+          {judges.map((judge) => (
+            <option key={judge} value={judge}>
+              {judge}
+            </option>
+          ))}
         </select>
         <button onClick={addNewJudge} className="add-judge-btn">
           + Add New Judge
