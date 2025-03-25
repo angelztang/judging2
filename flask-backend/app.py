@@ -51,10 +51,14 @@ def get_scores():
 def submit_score():
     data = request.get_json()
     
+    # Check that the data contains the necessary fields
+    if not data or not all(key in data for key in ['judge_id', 'team_id', 'score']):
+        return jsonify({"error": "Missing required data"}), 400
+    
     # Extract the score data
-    judge_id = data.get('judge_id')
-    team_id = data.get('team_id')
-    score = data.get('score')
+    judge_id = data['judge_id']
+    team_id = data['team_id']
+    score = data['score']
     
     # Create a new Score object
     new_score = Score(judge_id=judge_id, team_id=team_id, score=score)
@@ -67,35 +71,3 @@ def submit_score():
 
 if __name__ == '__main__':
     app.run(debug=True)
-
-# from flask import Flask, request, jsonify
-# from flask_sqlalchemy import SQLAlchemy
-# import os
-# from dotenv import load_dotenv
-
-# load_dotenv()
-# print(os.environ.get('DATABASE_URL'))
-
-# app = Flask(__name__)
-
-# # Set up the database URL
-# app.config['SQLALCHEMY_DATABASE_URI'] = os.environ['DATABASE_URL'].replace('postgres', 'postgresql+psycopg2')
-# app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-
-# db = SQLAlchemy(app)
-
-# # Define your model
-# class Score(db.Model):
-#     id = db.Column(db.Integer, primary_key=True)
-#     judge_id = db.Column(db.String(80), nullable=False)
-#     team_id = db.Column(db.String(80), nullable=False)
-#     score = db.Column(db.Float, nullable=False)
-
-# @app.route('/scores', methods=['GET'])
-# def get_scores():
-#     scores = Score.query.all()
-#     return jsonify([score.to_dict() for score in scores])
-
-# if __name__ == '__main__':
-#     app.run(debug=True)
-

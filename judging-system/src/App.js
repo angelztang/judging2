@@ -94,7 +94,7 @@ function App() {
     });
 
     // Submit the score data to the backend
-    newData.forEach(submitScore);  // Submitting to the backend
+    await Promise.all(newData.map(submitScore));
 
     // Update state with new data
     setScoreTableData((prevData) => {
@@ -219,6 +219,7 @@ function App() {
 
 const submitScore = async (scoreData) => {
   try {
+    console.log("Submitting score:", scoreData); // Log the score data being sent
     const response = await fetch('https://judging-system-a20f58757cfa.herokuapp.com/api/scores', {
       method: 'POST',
       headers: {
@@ -230,7 +231,7 @@ const submitScore = async (scoreData) => {
     if (response.ok) {
       console.log("Score submitted successfully!");
     } else {
-      console.error("Failed to submit score");
+      console.error("Failed to submit score", await response.text());
     }
   } catch (error) {
     console.error("Error submitting score:", error);
