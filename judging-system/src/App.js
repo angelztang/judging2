@@ -121,15 +121,8 @@ function App() {
       // Submit the score data to the backend
       await Promise.all(newData.map(submitScore));
 
-      // Update state with new data
-      setScoreTableData((prevData) => {
-        const updatedData = { ...prevData };
-        newData.forEach(({ team_id, judge_id, score }) => {
-          if (!updatedData[team_id]) updatedData[team_id] = {};
-          updatedData[team_id][judge_id] = score;
-        });
-        return updatedData;
-      });
+      // Fetch updated scores from the backend
+      await fetchScores();
 
       setSeenTeamsByJudge((prev) => ({
         ...prev,
@@ -153,15 +146,20 @@ function App() {
     return numJudges > 0 ? (totalScore / numJudges).toFixed(2) : "";
   };
 
+  // Fetch scores when component mounts
   useEffect(() => {
-    fetchScores();  // Fetch scores when the component loads
+    fetchScores();
   }, []);
 
   const fetchScores = async () => {
     try {
+      console.log("Fetching scores from:", `${BACKEND_URL}/api/scores`);
       const response = await fetch(`${BACKEND_URL}/api/scores`);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch scores: ${await response.text()}`);
+      }
       const data = await response.json();
-      console.log(data);
+      console.log("Received scores:", data);
 
       // Update the scoreTableData with the fetched scores
       const updatedData = {};
@@ -169,10 +167,17 @@ function App() {
         const { team_id, judge_id, score } = scoreEntry;
         if (!updatedData[team_id]) updatedData[team_id] = {};
         updatedData[team_id][judge_id] = score;
+        
+        // Add judge to judges list if not already present
+        if (!judges.includes(judge_id)) {
+          setJudges(prev => [...prev, judge_id]);
+        }
       });
+      console.log("Updated score table data:", updatedData);
       setScoreTableData(updatedData);
     } catch (error) {
       console.error("Error fetching scores:", error);
+      alert("Failed to fetch scores. Please refresh the page.");
     }
   };
 
