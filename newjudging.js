@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 
-const teams = Array.from({ length: 5 }, (_, i) => `Team ${i + 1}`);
+const teams = Array.from({ length: 100 }, (_, i) => `Team ${i + 1}`);
 
 const getRandomTeams = (availableTeams, seenTeams, count) => {
   let candidates = availableTeams.filter((team) => !seenTeams.includes(team));
