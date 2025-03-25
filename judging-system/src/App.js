@@ -35,12 +35,14 @@ function App() {
   const [scoreTableData, setScoreTableData] = useState({});
   const [teamAssignments, setTeamAssignments] = useState({});
   const [judgedTeams, setJudgedTeams] = useState(new Set());
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Initialize data on mount
+  // Fetch initial data immediately when component mounts
   useEffect(() => {
-    const initializeData = async () => {
+    const loadInitialData = async () => {
       try {
-        console.log("Initializing data...");
+        setIsLoading(true);
+        console.log("Fetching initial data...");
         const response = await fetch(`${BACKEND_URL}/api/scores`);
         if (!response.ok) {
           throw new Error(`Failed to fetch scores: ${await response.text()}`);
@@ -53,7 +55,7 @@ function App() {
         console.log("Setting initial judges:", uniqueJudges);
         setJudges(uniqueJudges);
 
-        // Initialize score table
+        // Initialize score table with all teams and judges
         const updatedData = {};
         teams.forEach(team => {
           updatedData[team] = {};
@@ -62,7 +64,7 @@ function App() {
           });
         });
 
-        // Fill in scores
+        // Fill in actual scores
         data.forEach(({ team_id, judge_id, score }) => {
           if (!updatedData[team_id]) {
             updatedData[team_id] = {};
@@ -70,6 +72,7 @@ function App() {
           updatedData[team_id][judge_id] = score;
         });
 
+        console.log("Setting score table data:", updatedData);
         setScoreTableData(updatedData);
 
         // Set seen teams
@@ -90,21 +93,23 @@ function App() {
 
         // Set judged teams
         setJudgedTeams(new Set(data.map(score => score.team_id)));
-
       } catch (error) {
-        console.error("Error initializing data:", error);
+        console.error("Error loading initial data:", error);
         alert("Failed to load initial data. Please refresh the page.");
+      } finally {
+        setIsLoading(false);
       }
     };
 
-    initializeData();
+    loadInitialData();
   }, []);
 
+  // Separate useEffect for handling judge changes
   useEffect(() => {
     if (currentJudge && !currentTeamsByJudge[currentJudge]) {
       assignNewTeams(currentJudge);
     }
-  }, [currentJudge]);
+  }, [currentJudge, currentTeamsByJudge]);
 
   const assignNewTeams = (judge) => {
     const seenTeams = seenTeamsByJudge[judge] || [];
@@ -264,6 +269,9 @@ function App() {
       });
       setTeamAssignments(teamAssignmentsData);
 
+      // Set judged teams
+      setJudgedTeams(new Set(data.map(score => score.team_id)));
+
     } catch (error) {
       console.error("Error fetching scores:", error);
       alert("Failed to fetch scores. Please refresh the page.");
@@ -274,83 +282,89 @@ function App() {
     <div className="container">
       <h1>Hackathon Judging System</h1>
 
-      <div className="select-container">
-        <label>Select Judge: </label>
-        <select value={currentJudge} onChange={handleJudgeChange}>
-          <option value="">Select a judge</option>
-          {judges.map((judge) => (
-            <option key={judge} value={judge}>
-              {judge}
-            </option>
-          ))}
-        </select>
-        <button onClick={addNewJudge} className="add-judge-btn">
-          + Add New Judge
-        </button>
-      </div>
-
-      <div className="team-inputs">
-        {(currentTeamsByJudge[currentJudge] || []).map((team, index) => (
-          <div key={team} className="team-input">
-            <span>{team}</span>
-            <input
-              type="number"
-              min="0"
-              max="10"
-              step="0.1"
-              placeholder="Enter score (0-10)"
-              value={scoresByJudge[currentJudge]?.[index] || ""}
-              onChange={(e) => handleScoreChange(index, e.target.value)}
-            />
-          </div>
-        ))}
-      </div>
-
-      {currentJudge && currentTeamsByJudge[currentJudge]?.length > 0 && (
-        <button 
-          onClick={handleSubmit} 
-          className="submit-btn"
-        >
-          Submit Scores
-        </button>
-      )}
-
-      <h2>Score Table</h2>
-      <div className="table-container">
-        <table>
-          <thead>
-            <tr>
-              <th>Team</th>
+      {isLoading ? (
+        <div>Loading judges and scores...</div>
+      ) : (
+        <>
+          <div className="select-container">
+            <label>Select Judge: </label>
+            <select value={currentJudge} onChange={handleJudgeChange}>
+              <option value="">Select a judge</option>
               {judges.map((judge) => (
-                <th key={judge}>{judge}</th>
+                <option key={judge} value={judge}>
+                  {judge}
+                </option>
               ))}
-              <th>Average</th>
-            </tr>
-          </thead>
-          <tbody>
-            {teams
-              .sort((a, b) => {
-                const numA = parseInt(a.split(' ')[1]);
-                const numB = parseInt(b.split(' ')[1]);
-                return numA - numB;
-              })
-              .map(team => {
-                const teamScores = scoreTableData[team] || {};
-                return (
-                  <tr key={team}>
-                    <td>{team}</td>
-                    {judges.map((judge) => (
-                      <td key={`${team}-${judge}`}>
-                        {teamScores[judge] || ""}
-                      </td>
-                    ))}
-                    <td>{calculateAverage(teamScores)}</td>
-                  </tr>
-                );
-              })}
-          </tbody>
-        </table>
-      </div>
+            </select>
+            <button onClick={addNewJudge} className="add-judge-btn">
+              + Add New Judge
+            </button>
+          </div>
+
+          <div className="team-inputs">
+            {(currentTeamsByJudge[currentJudge] || []).map((team, index) => (
+              <div key={team} className="team-input">
+                <span>{team}</span>
+                <input
+                  type="number"
+                  min="0"
+                  max="10"
+                  step="0.1"
+                  placeholder="Enter score (0-10)"
+                  value={scoresByJudge[currentJudge]?.[index] || ""}
+                  onChange={(e) => handleScoreChange(index, e.target.value)}
+                />
+              </div>
+            ))}
+          </div>
+
+          {currentJudge && currentTeamsByJudge[currentJudge]?.length > 0 && (
+            <button 
+              onClick={handleSubmit} 
+              className="submit-btn"
+            >
+              Submit Scores
+            </button>
+          )}
+
+          <h2>Score Table</h2>
+          <div className="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Team</th>
+                  {judges.map((judge) => (
+                    <th key={judge}>{judge}</th>
+                  ))}
+                  <th>Average</th>
+                </tr>
+              </thead>
+              <tbody>
+                {teams
+                  .sort((a, b) => {
+                    const numA = parseInt(a.split(' ')[1]);
+                    const numB = parseInt(b.split(' ')[1]);
+                    return numA - numB;
+                  })
+                  .map(team => {
+                    const teamScores = scoreTableData[team] || {};
+                    return (
+                      <tr key={team}>
+                        <td>{team}</td>
+                        {judges.map((judge) => (
+                          <td key={`${team}-${judge}`}>
+                            {teamScores[judge] || ""}
+                          </td>
+                        ))}
+                        <td>{calculateAverage(teamScores)}</td>
+                      </tr>
+                    );
+                  })}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -372,9 +386,15 @@ const submitScore = async (scoreData) => {
       body: JSON.stringify(scoreData),
     });
 
-    const responseText = await response.text();
+    let responseData;
+    try {
+      responseData = await response.json();
+    } catch (e) {
+      throw new Error('Failed to parse response JSON');
+    }
+
     console.log("Response status:", response.status);
-    console.log("Response text:", responseText);
+    console.log("Response data:", responseData);
 
     // Both 201 (Created) and 200 (Updated) are successful responses
     if (response.status === 201 || response.status === 200) {
@@ -382,7 +402,7 @@ const submitScore = async (scoreData) => {
       return true;
     }
 
-    throw new Error(`Failed to submit score: ${responseText}`);
+    throw new Error(responseData.error || 'Failed to submit score');
   } catch (error) {
     console.error("Error submitting score:", error);
     console.error("Error details:", error.message);
