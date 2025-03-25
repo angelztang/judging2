@@ -299,10 +299,10 @@ function App() {
                   type="number"
                   min="0"
                   max="3"
-                  step="0.1"
                   placeholder="Enter score (0-3)"
                   value={scoresByJudge[currentJudge]?.[index] || ""}
                   onChange={(e) => handleScoreChange(index, e.target.value)}
+                  className="score-input"
                 />
               </div>
             ))}
