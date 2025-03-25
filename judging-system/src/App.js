@@ -164,18 +164,25 @@ function App() {
       const data = await response.json();
       console.log("Received scores:", data);
 
+      // Extract unique judges from the data
+      const uniqueJudges = new Set(data.map(score => score.judge_id));
+      console.log("Found judges:", Array.from(uniqueJudges));
+
+      // Update judges list with any new judges
+      setJudges(prevJudges => {
+        const newJudges = Array.from(uniqueJudges).filter(judge => !prevJudges.includes(judge));
+        console.log("Adding new judges:", newJudges);
+        return [...prevJudges, ...newJudges];
+      });
+
       // Update the scoreTableData with the fetched scores
       const updatedData = {};
       data.forEach((scoreEntry) => {
         const { team_id, judge_id, score } = scoreEntry;
         if (!updatedData[team_id]) updatedData[team_id] = {};
         updatedData[team_id][judge_id] = score;
-        
-        // Add judge to judges list if not already present
-        if (!judges.includes(judge_id)) {
-          setJudges(prev => [...prev, judge_id]);
-        }
       });
+      
       console.log("Updated score table data:", updatedData);
       setScoreTableData(updatedData);
     } catch (error) {
