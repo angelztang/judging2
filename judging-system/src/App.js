@@ -106,21 +106,19 @@ function App() {
       return;
     }
 
-    const newData = currentTeams.map((team, index) => {
-      const existingScore = scoreTableData[team]?.[currentJudge];
-      const score = existingScore !== undefined ? existingScore : parseFloat(currentScores[index]);
-      return {
+    try {
+      const newData = currentTeams.map((team, index) => ({
         judge_id: currentJudge,
         team_id: team,
-        score: score
-      };
-    });
+        score: parseFloat(currentScores[index])
+      }));
 
-    try {
       console.log('Submitting scores:', newData);
-      // Submit the score data to the backend
-      await Promise.all(newData.map(submitScore));
-
+      
+      // Submit all scores and track results
+      const results = await Promise.all(newData.map(submitScore));
+      const successfulSubmissions = results.filter(Boolean).length;
+      
       // Fetch updated scores from the backend
       await fetchScores();
 
@@ -130,10 +128,15 @@ function App() {
       }));
 
       assignNewTeams(currentJudge);
-      alert('Scores submitted successfully!');
+      
+      if (successfulSubmissions === newData.length) {
+        alert('All scores submitted successfully!');
+      } else {
+        alert(`${successfulSubmissions} new scores submitted. Some scores were already in the system and were not updated.`);
+      }
     } catch (error) {
       console.error('Error submitting scores:', error);
-      alert('Failed to submit scores. Please try again. Error: ' + error.message);
+      alert('Failed to submit some scores. Please try again. Error: ' + error.message);
     }
   };
 
@@ -271,15 +274,17 @@ const submitScore = async (scoreData) => {
     console.log("Response status:", response.status);
     console.log("Response text:", responseText);
 
-    if (!response.ok) {
+    // Consider both 201 (Created) and 200 (OK, duplicate) as success
+    if (response.status !== 201 && response.status !== 200) {
       throw new Error(`Failed to submit score: ${responseText}`);
     }
 
     console.log("Score submitted successfully!");
+    return true;
   } catch (error) {
     console.error("Error submitting score:", error);
     console.error("Error details:", error.message);
-    throw error; // Re-throw to be caught by handleSubmit
+    throw error;
   }
 };
 
