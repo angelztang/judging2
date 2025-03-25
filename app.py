@@ -86,18 +86,19 @@ def submit_score():
         if not (0 <= score <= 10):
             return jsonify({"error": "Score must be between 0 and 10"}), 400
         
-        # Only add the score if it doesn't exist
+        # Check if the score exists and update instead of ignoring
         existing_score = Score.query.filter_by(judge_id=judge_id, team_id=team_id).first()
-        if not existing_score:
+        if existing_score:
+            existing_score.score = score
+            print(f"Updating score for {judge_id}, {team_id}: {score}")
+        else:
             new_score = Score(judge_id=judge_id, team_id=team_id, score=score)
             db.session.add(new_score)
             print(f"Adding new score for {judge_id}, {team_id}: {score}")
-            db.session.commit()
-            return jsonify({"message": "Score submitted successfully!"}), 201
-        else:
-            print(f"Ignoring duplicate score for {judge_id}, {team_id}")
-            return jsonify({"message": "Score already exists, ignoring duplicate"}), 200
         
+        db.session.commit()
+        return jsonify({"message": "Score submitted successfully!"}), 201
+    
     except ValueError as e:
         print(f"Value error: {e}")
         return jsonify({"error": "Invalid score value"}), 400
