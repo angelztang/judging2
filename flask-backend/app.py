@@ -25,8 +25,8 @@ def get_db_connection():
 # Score model
 class Score(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    judge_id = db.Column(db.String(80), nullable=False)
-    team_id = db.Column(db.String(80), nullable=False)
+    judge_id = db.Column(db.String(80), nullable=False, index=True)
+    team_id = db.Column(db.String(80), nullable=False, index=True)
     score = db.Column(db.Float, nullable=False)
     
     # Add unique constraint to prevent duplicate scores
@@ -110,22 +110,26 @@ def submit_score():
         if not (0 <= score <= 3):
             return jsonify({"error": "Score must be between 0 and 3"}), 400
         
-        # Check if the score exists and update instead of ignoring
-        existing_score = Score.query.filter_by(judge_id=judge_id, team_id=team_id).first()
-        if existing_score:
-            existing_score.score = score
-            print(f"Updating score for {judge_id}, {team_id}: {score}")
+        # Use upsert to handle both insert and update efficiently
+        score_obj = Score.query.filter_by(judge_id=judge_id, team_id=team_id).first()
+        if score_obj:
+            score_obj.score = score
         else:
-            new_score = Score(judge_id=judge_id, team_id=team_id, score=score)
-            db.session.add(new_score)
-            print(f"Adding new score for {judge_id}, {team_id}: {score}")
+            score_obj = Score(judge_id=judge_id, team_id=team_id, score=score)
+            db.session.add(score_obj)
         
         db.session.commit()
-        return jsonify({"message": "Score submitted successfully!"}), 201
+        
+        # Return the complete updated data
+        return jsonify({
+            "message": "Score submitted successfully!",
+            "score": {
+                "judge_id": judge_id,
+                "team_id": team_id,
+                "score": score
+            }
+        }), 201
     
-    except ValueError as e:
-        print(f"Value error: {e}")
-        return jsonify({"error": "Invalid score value"}), 400
     except Exception as e:
         print(f"Error submitting score: {e}")
         db.session.rollback()
