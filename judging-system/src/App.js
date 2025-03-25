@@ -141,20 +141,35 @@ function App() {
   };
 
   const handleJudgeChange = (event) => {
-    setCurrentJudge(event.target.value);
+    const selectedJudge = event.target.value;
+    console.log('Selected judge:', selectedJudge);
+    setCurrentJudge(selectedJudge);
+    
+    if (selectedJudge && !currentTeamsByJudge[selectedJudge]) {
+      assignNewTeams(selectedJudge);
+    }
   };
 
   const addNewJudge = async () => {
     const newJudge = prompt("Enter your name:");
     if (newJudge && !judges.includes(newJudge)) {
       try {
-        // Add the judge to the backend
-        const response = await fetch(`${BACKEND_URL}/api/judges`, {
+        console.log('Adding new judge:', newJudge);
+        
+        // Create initial score to persist the judge
+        const initialScore = {
+          judge_id: newJudge,
+          team_id: "Team 1",
+          score: 0
+        };
+        
+        const response = await fetch(`${BACKEND_URL}/api/scores`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'Accept': 'application/json'
           },
-          body: JSON.stringify({ judge_id: newJudge })
+          body: JSON.stringify(initialScore)
         });
 
         if (!response.ok) {
@@ -163,11 +178,19 @@ function App() {
         }
 
         // Add the judge to the frontend state
-        setJudges([...judges, newJudge]);
+        setJudges(prev => [...prev, newJudge]);
         setCurrentJudge(newJudge);
         
-        // Refresh the data to ensure everything is in sync
+        // Initialize empty data structures for the new judge
+        setCurrentTeamsByJudge(prev => ({ ...prev, [newJudge]: [] }));
+        setScoresByJudge(prev => ({ ...prev, [newJudge]: [] }));
+        setSeenTeamsByJudge(prev => ({ ...prev, [newJudge]: [] }));
+        
+        // Fetch latest data to ensure everything is in sync
         await fetchScores();
+        
+        // Then assign new teams
+        assignNewTeams(newJudge);
         
         alert('Judge added successfully!');
       } catch (error) {
@@ -202,6 +225,10 @@ function App() {
     }
 
     try {
+      console.log('Current judge:', currentJudge);
+      console.log('Current teams:', currentTeams);
+      console.log('Current scores:', currentScores);
+
       const newData = currentTeams.map((team, index) => ({
         judge_id: currentJudge,
         team_id: team,
@@ -210,14 +237,21 @@ function App() {
 
       console.log('Submitting scores:', newData);
       
-      await Promise.all(newData.map(submitScore));
+      // Submit scores one at a time to avoid race conditions
+      for (const scoreData of newData) {
+        await submitScore(scoreData);
+      }
+      
+      // Fetch latest data
       await fetchScores();
 
+      // Update seen teams
       setSeenTeamsByJudge(prev => ({
         ...prev,
         [currentJudge]: [...new Set([...(prev[currentJudge] || []), ...currentTeams])]
       }));
 
+      // Assign new teams
       assignNewTeams(currentJudge);
       
       alert('All scores submitted successfully!');
