@@ -8,7 +8,7 @@ import psycopg2
 # Load environment variables from the .env file
 load_dotenv()
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder='static', static_url_path='')
 CORS(app)  # This will allow cross-origin requests from your React app
 
 # Configure the database
@@ -35,14 +35,13 @@ class Score(db.Model):
     )
 
 # Serve the frontend
-@app.route('/')
-def index():
-    return send_from_directory(os.path.join(app.root_path, 'static'), 'index.html')
-
-# Optionally, handle any other frontend assets (like CSS or JS)
+@app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')
-def serve_static(path):
-    return send_from_directory(os.path.join(app.root_path, 'static'), path)
+def serve(path):
+    if path and os.path.exists(os.path.join(app.static_folder, path)):
+        return send_from_directory(app.static_folder, path)
+    else:
+        return send_from_directory(app.static_folder, 'index.html')
 
 # Endpoint to fetch all scores from the database
 @app.route('/api/scores', methods=['GET'])
