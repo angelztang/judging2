@@ -24,7 +24,7 @@ const getWeightedRandomTeams = (availableTeams, seenTeams, count, teamAssignment
   return Array.from(selected);
 };
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'https://judging-system-a20f58757cfa.herokuapp.com';
+const BACKEND_URL = 'https://judging-system-a20f58757cfa.herokuapp.com';
 
 function App() {
   const [currentTeamsByJudge, setCurrentTeamsByJudge] = useState({});
@@ -81,10 +81,19 @@ function App() {
   };
 
   const handleSubmit = async () => {
-    if (!currentJudge) return;
+    if (!currentJudge) {
+      alert('Please select a judge first');
+      return;
+    }
 
     const currentTeams = currentTeamsByJudge[currentJudge] || [];
     const currentScores = scoresByJudge[currentJudge] || [];
+
+    // Check if we have all scores
+    if (currentScores.some(score => score === "")) {
+      alert('Please enter scores for all teams');
+      return;
+    }
 
     // Validate scores
     const invalidScores = currentScores.some(score => {
@@ -99,14 +108,16 @@ function App() {
 
     const newData = currentTeams.map((team, index) => {
       const existingScore = scoreTableData[team]?.[currentJudge];
+      const score = existingScore !== undefined ? existingScore : parseFloat(currentScores[index]);
       return {
         judge_id: currentJudge,
         team_id: team,
-        score: existingScore !== undefined ? existingScore : currentScores[index],
+        score: score
       };
     });
 
     try {
+      console.log('Submitting scores:', newData);
       // Submit the score data to the backend
       await Promise.all(newData.map(submitScore));
 
@@ -126,9 +137,10 @@ function App() {
       }));
 
       assignNewTeams(currentJudge);
+      alert('Scores submitted successfully!');
     } catch (error) {
       console.error('Error submitting scores:', error);
-      alert('Failed to submit scores. Please try again.');
+      alert('Failed to submit scores. Please try again. Error: ' + error.message);
     }
   };
 
@@ -235,23 +247,33 @@ function App() {
 
 const submitScore = async (scoreData) => {
   try {
-    console.log("Submitting score:", scoreData);
+    // Ensure score is a number
+    scoreData.score = parseFloat(scoreData.score);
+    
+    console.log("Submitting score to:", `${BACKEND_URL}/api/scores`);
+    console.log("Score data:", JSON.stringify(scoreData, null, 2));
+    
     const response = await fetch(`${BACKEND_URL}/api/scores`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Accept': 'application/json'
       },
       body: JSON.stringify(scoreData),
     });
 
+    const responseText = await response.text();
+    console.log("Response status:", response.status);
+    console.log("Response text:", responseText);
+
     if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Failed to submit score: ${errorText}`);
+      throw new Error(`Failed to submit score: ${responseText}`);
     }
 
     console.log("Score submitted successfully!");
   } catch (error) {
     console.error("Error submitting score:", error);
+    console.error("Error details:", error.message);
     throw error; // Re-throw to be caught by handleSubmit
   }
 };

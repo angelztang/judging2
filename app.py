@@ -9,7 +9,14 @@ import psycopg2
 load_dotenv()
 
 app = Flask(__name__, static_folder='static')
-CORS(app)  # This will allow cross-origin requests from your React app
+# Configure CORS to allow requests from any origin
+CORS(app, resources={
+    r"/api/*": {
+        "origins": "*",
+        "methods": ["GET", "POST", "OPTIONS"],
+        "allow_headers": ["Content-Type"]
+    }
+})
 
 # Configure the database
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ['DATABASE_URL'].replace('postgres', 'postgresql+psycopg2') # Heroku provides this as an environment variable
