@@ -24,6 +24,8 @@ const getWeightedRandomTeams = (availableTeams, seenTeams, count, teamAssignment
   return Array.from(selected);
 };
 
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'https://judging-system-a20f58757cfa.herokuapp.com';
+
 function App() {
   const [currentTeamsByJudge, setCurrentTeamsByJudge] = useState({});
   const [scoresByJudge, setScoresByJudge] = useState({});
@@ -84,36 +86,50 @@ function App() {
     const currentTeams = currentTeamsByJudge[currentJudge] || [];
     const currentScores = scoresByJudge[currentJudge] || [];
 
+    // Validate scores
+    const invalidScores = currentScores.some(score => {
+      const numScore = parseFloat(score);
+      return isNaN(numScore) || numScore < 0 || numScore > 10;
+    });
+
+    if (invalidScores) {
+      alert('Please enter valid scores between 0 and 10 for all teams');
+      return;
+    }
+
     const newData = currentTeams.map((team, index) => {
       const existingScore = scoreTableData[team]?.[currentJudge];
       return {
-        Team: team,
-        Judge: currentJudge,
-        Score: existingScore !== undefined ? existingScore : currentScores[index],
+        judge_id: currentJudge,
+        team_id: team,
+        score: existingScore !== undefined ? existingScore : currentScores[index],
       };
     });
 
-    // Submit the score data to the backend
-    await Promise.all(newData.map(submitScore));
+    try {
+      // Submit the score data to the backend
+      await Promise.all(newData.map(submitScore));
 
-    // Update state with new data
-    setScoreTableData((prevData) => {
-      const updatedData = { ...prevData };
-      newData.forEach(({ Team, Judge, Score }) => {
-        if (!updatedData[Team]) {
-          updatedData[Team] = {};
-        }
-        updatedData[Team][Judge] = Score;
+      // Update state with new data
+      setScoreTableData((prevData) => {
+        const updatedData = { ...prevData };
+        newData.forEach(({ team_id, judge_id, score }) => {
+          if (!updatedData[team_id]) updatedData[team_id] = {};
+          updatedData[team_id][judge_id] = score;
+        });
+        return updatedData;
       });
-      return updatedData;
-    });
 
-    setSeenTeamsByJudge((prev) => ({
-      ...prev,
-      [currentJudge]: [...(prev[currentJudge] || []), ...currentTeams],
-    }));
+      setSeenTeamsByJudge((prev) => ({
+        ...prev,
+        [currentJudge]: [...(prev[currentJudge] || []), ...currentTeams],
+      }));
 
-    assignNewTeams(currentJudge);
+      assignNewTeams(currentJudge);
+    } catch (error) {
+      console.error('Error submitting scores:', error);
+      alert('Failed to submit scores. Please try again.');
+    }
   };
 
   const calculateAverage = (teamScores) => {
@@ -131,18 +147,18 @@ function App() {
 
   const fetchScores = async () => {
     try {
-      const response = await fetch('https://judging-system-a20f58757cfa.herokuapp.com/api/scores');
+      const response = await fetch(`${BACKEND_URL}/api/scores`);
       const data = await response.json();
-      console.log(data); // Use the data to populate the UI
+      console.log(data);
 
       // Update the scoreTableData with the fetched scores
       const updatedData = {};
       data.forEach((scoreEntry) => {
-        const { Team, Judge, Score } = scoreEntry;
-        if (!updatedData[Team]) updatedData[Team] = {};
-        updatedData[Team][Judge] = Score;
+        const { team_id, judge_id, score } = scoreEntry;
+        if (!updatedData[team_id]) updatedData[team_id] = {};
+        updatedData[team_id][judge_id] = score;
       });
-      setScoreTableData(updatedData); // Set the fetched scores
+      setScoreTableData(updatedData);
     } catch (error) {
       console.error("Error fetching scores:", error);
     }
@@ -219,8 +235,8 @@ function App() {
 
 const submitScore = async (scoreData) => {
   try {
-    console.log("Submitting score:", scoreData); // Log the score data being sent
-    const response = await fetch('https://judging-system-a20f58757cfa.herokuapp.com/api/scores', {
+    console.log("Submitting score:", scoreData);
+    const response = await fetch(`${BACKEND_URL}/api/scores`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -228,13 +244,15 @@ const submitScore = async (scoreData) => {
       body: JSON.stringify(scoreData),
     });
 
-    if (response.ok) {
-      console.log("Score submitted successfully!");
-    } else {
-      console.error("Failed to submit score", await response.text());
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to submit score: ${errorText}`);
     }
+
+    console.log("Score submitted successfully!");
   } catch (error) {
     console.error("Error submitting score:", error);
+    throw error; // Re-throw to be caught by handleSubmit
   }
 };
 
