@@ -98,30 +98,48 @@ body {
   /* Score Table - make it horizontally scrollable */
   .table-container {
     overflow-x: auto;
-    margin-top: 30px;
+    max-width: 100%;
+    background-color: #f5f5f5;
+    padding: 15px;
+    border-radius: 5px;
+    margin-top: 20px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
   }
   
   table {
     width: 100%;
     border-collapse: collapse;
-    margin-top: 30px;
+    white-space: nowrap;
+    background-color: white;
   }
   
   th, td {
-    padding: 12px 15px;
-    text-align: center;
     border: 1px solid #ddd;
   }
   
-  th {
-    background-color: #d48277;
-  }
-  
   tr:nth-child(even) {
-    background-color: #1b2d3f;
+    background-color: #f9f9f9;
   }
   
   tr:hover {
-    background-color: #d48277;
+    background-color: #f5f5f5;
+  }
+  
+  /* Make the average column sticky */
+  th:last-child, td:last-child {
+    position: sticky;
+    right: 0;
+    background-color: inherit;
+    z-index: 1;
+  }
+  
+  th:last-child {
+    background-color: #4CAF50 !important;
+    color: white;
+  }
+  
+  td:last-child {
+    background-color: #f9f9f9 !important;
+    font-weight: bold;
   }
   

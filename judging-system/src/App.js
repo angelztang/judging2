@@ -43,29 +43,30 @@ function App() {
         ]);
 
         const judgesData = await judgesRes.json();
+        // Sort judges alphabetically
+        const sortedJudges = judgesData.sort((a, b) => a.localeCompare(b));
+        
         const scoresData = await scoresRes.json();
 
-        // Initialize score table with existing scores
+        // Initialize score table
         const newScoreTable = {};
         teams.forEach(team => {
           newScoreTable[team] = {};
+          // Initialize all scores as undefined (not empty string)
+          sortedJudges.forEach(judge => {
+            newScoreTable[team][judge] = undefined;
+          });
         });
 
-        // Track seen teams and fill score table
-        const newSeenTeams = {};
+        // Fill in scores, including zeros
         scoresData.forEach(({ team_id, judge_id, score }) => {
           if (!newScoreTable[team_id]) newScoreTable[team_id] = {};
-          newScoreTable[team_id][judge_id] = score;
-          
-          if (!newSeenTeams[judge_id]) newSeenTeams[judge_id] = [];
-          if (!newSeenTeams[judge_id].includes(team_id)) {
-            newSeenTeams[judge_id].push(team_id);
-          }
+          newScoreTable[team_id][judge_id] = score; // Store number directly
         });
 
-        setJudges(judgesData);
+        setJudges(sortedJudges);
         setScoreTableData(newScoreTable);
-        setSeenTeamsByJudge(newSeenTeams);
+        setSeenTeamsByJudge({});
         setIsLoading(false);
       } catch (error) {
         console.error("Error loading data:", error);
@@ -105,13 +106,18 @@ function App() {
 
   const addNewJudge = async () => {
     const newJudge = prompt("Enter your name:");
-    if (!newJudge || judges.includes(newJudge)) return;
+    if (!newJudge) return;
+    
+    // Check case-insensitive duplicates
+    if (judges.some(j => j.toLowerCase() === newJudge.toLowerCase())) {
+      alert("Judge already exists!");
+      return;
+    }
 
     try {
-      // Add judge to state immediately
-      setJudges(prev => [...prev, newJudge]);
-      setCurrentJudge(newJudge);
-
+      // Add judge to state (maintaining sort)
+      setJudges(prev => [...prev, newJudge].sort((a, b) => a.localeCompare(b)));
+      
       // Assign teams immediately
       const newTeams = getWeightedRandomTeams(teams, [], 5);
       setCurrentTeamsByJudge(prev => ({ ...prev, [newJudge]: newTeams }));
@@ -129,6 +135,7 @@ function App() {
       });
     } catch (error) {
       console.error("Error adding judge:", error);
+      alert("Failed to add judge. Please try again.");
     }
   };
 
@@ -214,6 +221,14 @@ function App() {
     }
   };
 
+  // Add or update the average calculation function
+  const calculateAverage = (teamScores) => {
+    const scores = Object.values(teamScores).filter(score => score !== undefined);
+    if (scores.length === 0) return "";
+    const sum = scores.reduce((a, b) => a + b, 0);
+    return (sum / scores.length).toFixed(2);
+  };
+
   return (
     <div className="container">
       <h1>Hackathon Judging System</h1>
@@ -224,7 +239,11 @@ function App() {
         <>
           <div className="select-container">
             <label>Select Judge: </label>
-            <select value={currentJudge} onChange={handleJudgeChange}>
+            <select 
+              value={currentJudge} 
+              onChange={handleJudgeChange}
+              style={{ minWidth: '200px' }}
+            >
               <option value="">Select a judge</option>
               {judges.map(judge => (
                 <option key={judge} value={judge}>{judge}</option>
@@ -258,30 +277,120 @@ function App() {
           )}
 
           <h2>Score Table</h2>
-          <table>
-            <thead>
-              <tr>
-                <th>Team</th>
-                {judges.map(judge => <th key={judge}>{judge}</th>)}
-              </tr>
-            </thead>
-            <tbody>
-              {teams.map(team => (
-                <tr key={team}>
-                  <td>{team}</td>
+          <div className="table-container" style={{
+            overflowX: 'auto',
+            maxWidth: '100%',
+            backgroundColor: '#f5f5f5',
+            padding: '15px',
+            borderRadius: '5px',
+            marginTop: '20px'
+          }}>
+            <table style={{ 
+              width: '100%',
+              borderCollapse: 'collapse',
+              whiteSpace: 'nowrap'
+            }}>
+              <thead>
+                <tr>
+                  <th style={tableHeaderStyle}>Team</th>
                   {judges.map(judge => (
-                    <td key={`${team}-${judge}`}>
-                      {scoreTableData[team]?.[judge] || ""}
-                    </td>
+                    <th key={judge} style={tableHeaderStyle}>{judge}</th>
                   ))}
+                  <th style={{
+                    ...tableHeaderStyle,
+                    backgroundColor: '#4CAF50',
+                    color: 'white',
+                    position: 'sticky',
+                    right: 0,
+                    zIndex: 1
+                  }}>Average</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {teams.map(team => {
+                  const teamScores = scoreTableData[team] || {};
+                  const average = calculateAverage(teamScores);
+                  
+                  return (
+                    <tr key={team}>
+                      <td style={tableCellStyle}>{team}</td>
+                      {judges.map(judge => (
+                        <td key={`${team}-${judge}`} style={tableCellStyle}>
+                          {teamScores[judge] !== undefined ? teamScores[judge] : ""}
+                        </td>
+                      ))}
+                      <td style={{
+                        ...tableCellStyle,
+                        backgroundColor: '#f9f9f9',
+                        position: 'sticky',
+                        right: 0,
+                        fontWeight: 'bold'
+                      }}>{average}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </>
       )}
     </div>
   );
 }
+
+// Add these styles
+const tableHeaderStyle = {
+  padding: '12px 15px',
+  textAlign: 'center',
+  backgroundColor: '#4a90e2',
+  color: 'white',
+  position: 'sticky',
+  top: 0,
+  zIndex: 1
+};
+
+const tableCellStyle = {
+  padding: '8px 15px',
+  textAlign: 'center',
+  borderBottom: '1px solid #ddd'
+};
+
+// Add some CSS to your App1.css file
+const cssToAdd = `
+.table-container {
+  overflow-x: auto;
+  max-width: 100%;
+  background-color: #f5f5f5;
+  padding: 15px;
+  border-radius: 5px;
+  margin-top: 20px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  white-space: nowrap;
+  background-color: white;
+}
+
+th, td {
+  border: 1px solid #ddd;
+}
+
+tr:nth-child(even) {
+  background-color: #f9f9f9;
+}
+
+tr:hover {
+  background-color: #f5f5f5;
+}
+
+.container {
+  padding: 20px;
+  max-width: 100%;
+  margin: 0 auto;
+}
+`;
 
 export default App;
