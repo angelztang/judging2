@@ -6,14 +6,21 @@ const BACKEND_URL = 'https://judging-system-a20f58757cfa.herokuapp.com';
 
 const getWeightedRandomTeams = (availableTeams, seenTeams, count) => {
   let candidates = availableTeams.filter(team => !seenTeams.includes(team));
-  candidates.sort((a, b) => parseInt(a.split(' ')[1]) - parseInt(b.split(' ')[1]));
-
-  let selected = new Set();
-  while (selected.size < count && candidates.length > 0) {
-    const randomIndex = Math.floor(Math.random() * candidates.length);
-    selected.add(candidates[randomIndex]);
+  
+  // If we don't have enough unscored teams, allow rescoring some teams
+  if (candidates.length < count) {
+    const additionalNeeded = count - candidates.length;
+    const rescoreCandidates = availableTeams
+      .filter(team => seenTeams.includes(team))
+      .sort(() => Math.random() - 0.5)
+      .slice(0, additionalNeeded);
+    candidates = [...candidates, ...rescoreCandidates];
   }
-  return Array.from(selected);
+  
+  // Shuffle the candidates
+  candidates.sort(() => Math.random() - 0.5);
+  
+  return candidates.slice(0, count);
 };
 
 function App() {
@@ -38,39 +45,34 @@ function App() {
         const judgesData = await judgesRes.json();
         const scoresData = await scoresRes.json();
 
-        // Set judges
-        setJudges(judgesData);
-
-        // Initialize score table
-        const scoreTable = {};
+        // Initialize score table with existing scores
+        const newScoreTable = {};
         teams.forEach(team => {
-          scoreTable[team] = {};
-          judgesData.forEach(judge => {
-            scoreTable[team][judge] = "";
-          });
+          newScoreTable[team] = {};
         });
 
-        // Fill in existing scores
+        // Track seen teams and fill score table
+        const newSeenTeams = {};
         scoresData.forEach(({ team_id, judge_id, score }) => {
-          if (!scoreTable[team_id]) scoreTable[team_id] = {};
-          scoreTable[team_id][judge_id] = score;
+          if (!newScoreTable[team_id]) newScoreTable[team_id] = {};
+          newScoreTable[team_id][judge_id] = score;
+          
+          if (!newSeenTeams[judge_id]) newSeenTeams[judge_id] = [];
+          if (!newSeenTeams[judge_id].includes(team_id)) {
+            newSeenTeams[judge_id].push(team_id);
+          }
         });
-        setScoreTableData(scoreTable);
 
-        // Set seen teams
-        const seenTeams = {};
-        judgesData.forEach(judge => {
-          seenTeams[judge] = scoresData
-            .filter(score => score.judge_id === judge)
-            .map(score => score.team_id);
-        });
-        setSeenTeamsByJudge(seenTeams);
+        setJudges(judgesData);
+        setScoreTableData(newScoreTable);
+        setSeenTeamsByJudge(newSeenTeams);
+        setIsLoading(false);
       } catch (error) {
         console.error("Error loading data:", error);
-      } finally {
-        setIsLoading(false);
+        alert("Error loading data. Please refresh the page.");
       }
     };
+
     loadData();
   }, []);
 
@@ -85,7 +87,20 @@ function App() {
   }, [currentJudge]);
 
   const handleJudgeChange = (event) => {
-    setCurrentJudge(event.target.value);
+    const selectedJudge = event.target.value;
+    if (!selectedJudge) {
+      setCurrentJudge("");
+      setCurrentTeamsByJudge({});
+      setScoresByJudge({});
+      return;
+    }
+
+    const judgeSeenTeams = seenTeamsByJudge[selectedJudge] || [];
+    const newTeams = getWeightedRandomTeams(teams, judgeSeenTeams, 5);
+    
+    setCurrentJudge(selectedJudge);
+    setCurrentTeamsByJudge(prev => ({ ...prev, [selectedJudge]: newTeams }));
+    setScoresByJudge(prev => ({ ...prev, [selectedJudge]: Array(5).fill("") }));
   };
 
   const addNewJudge = async () => {
@@ -127,39 +142,75 @@ function App() {
   };
 
   const handleSubmit = async () => {
-    if (!currentJudge) return;
-
-    const currentTeams = currentTeamsByJudge[currentJudge];
-    const currentScores = scoresByJudge[currentJudge];
+    if (!currentJudge || scoresByJudge[currentJudge].some(score => score === "")) {
+      alert("Please enter all scores before submitting.");
+      return;
+    }
 
     try {
-      // Submit all scores
-      await Promise.all(currentTeams.map((team, index) => 
-        fetch(`${BACKEND_URL}/api/scores`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            judge_id: currentJudge,
-            team_id: team,
-            score: parseFloat(currentScores[index])
-          })
-        })
-      ));
+      // Submit scores and update table immediately
+      const currentTeams = currentTeamsByJudge[currentJudge];
+      const currentScores = scoresByJudge[currentJudge];
+      
+      for (let i = 0; i < currentTeams.length; i++) {
+        const team = currentTeams[i];
+        const score = parseFloat(currentScores[i]);
+        
+        try {
+          // Submit to backend
+          const response = await fetch(`${BACKEND_URL}/api/scores`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              judge_id: currentJudge,
+              team_id: team,
+              score: score
+            })
+          });
 
-      // Update seen teams
-      setSeenTeamsByJudge(prev => ({
-        ...prev,
-        [currentJudge]: [...(prev[currentJudge] || []), ...currentTeams]
-      }));
+          if (!response.ok) {
+            console.warn(`Warning: Failed to submit score for ${team}, continuing with other scores`);
+            continue; // Continue with other scores even if one fails
+          }
 
-      // Assign new teams
-      const newTeams = getWeightedRandomTeams(teams, seenTeamsByJudge[currentJudge] || [], 5);
+          // Update the score table immediately for each successful score
+          setScoreTableData(prev => ({
+            ...prev,
+            [team]: {
+              ...(prev[team] || {}),
+              [currentJudge]: score
+            }
+          }));
+        } catch (error) {
+          console.warn(`Warning: Error submitting score for ${team}:`, error);
+          continue; // Continue with other scores even if one fails
+        }
+      }
+
+      // Update seen teams (only add teams that weren't previously seen)
+      setSeenTeamsByJudge(prev => {
+        const prevTeams = new Set(prev[currentJudge] || []);
+        const newTeams = currentTeams.filter(team => !prevTeams.has(team));
+        return {
+          ...prev,
+          [currentJudge]: [...prevTeams, ...newTeams]
+        };
+      });
+
+      // Assign new teams, excluding current teams to avoid duplicates
+      const newTeams = getWeightedRandomTeams(
+        teams, 
+        seenTeamsByJudge[currentJudge] || [], 
+        5
+      );
       setCurrentTeamsByJudge(prev => ({ ...prev, [currentJudge]: newTeams }));
       setScoresByJudge(prev => ({ ...prev, [currentJudge]: Array(5).fill("") }));
 
       alert('Scores submitted successfully!');
     } catch (error) {
       console.error("Error submitting scores:", error);
+      alert('Some scores may not have been submitted. Please check the score table.');
+      // Don't freeze - still allow continuing
     }
   };
 
