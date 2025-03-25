@@ -148,6 +148,7 @@ function App() {
 
   // Fetch scores when component mounts
   useEffect(() => {
+    console.log("Initial mount - fetching scores");
     fetchScores();
   }, []);
 
@@ -162,23 +163,26 @@ function App() {
       console.log("Received scores:", data);
 
       // Extract unique judges from the data
-      const uniqueJudges = [...new Set(data.map(score => score.judge_id))];
+      const uniqueJudges = [...new Set(data.map(score => score.judge_id))].sort();
       console.log("Found judges:", uniqueJudges);
 
       // Update judges list
       setJudges(uniqueJudges);
 
-      // Initialize score table with all teams
+      // Initialize score table with all teams and judges
       const updatedData = {};
       teams.forEach(team => {
         updatedData[team] = {};
         uniqueJudges.forEach(judge => {
-          updatedData[team][judge] = ""; // Initialize with empty string
+          updatedData[team][judge] = "";
         });
       });
 
       // Fill in actual scores
       data.forEach(({ team_id, judge_id, score }) => {
+        if (!updatedData[team_id]) {
+          updatedData[team_id] = {};
+        }
         updatedData[team_id][judge_id] = score;
       });
 
@@ -187,12 +191,12 @@ function App() {
 
       // Update seen teams for each judge
       const seenTeamsByJudgeData = {};
-      data.forEach(({ team_id, judge_id }) => {
-        if (!seenTeamsByJudgeData[judge_id]) {
-          seenTeamsByJudgeData[judge_id] = [];
-        }
-        seenTeamsByJudgeData[judge_id].push(team_id);
+      uniqueJudges.forEach(judge => {
+        seenTeamsByJudgeData[judge] = data
+          .filter(score => score.judge_id === judge)
+          .map(score => score.team_id);
       });
+      console.log("Seen teams by judge:", seenTeamsByJudgeData);
       setSeenTeamsByJudge(seenTeamsByJudgeData);
 
       // Update team assignments
@@ -216,11 +220,15 @@ function App() {
         <label>Select Judge: </label>
         <select value={currentJudge} onChange={handleJudgeChange}>
           <option value="">Select a judge</option>
-          {judges.map((judge) => (
-            <option key={judge} value={judge}>
-              {judge}
-            </option>
-          ))}
+          {judges.length > 0 ? (
+            judges.map((judge) => (
+              <option key={judge} value={judge}>
+                {judge}
+              </option>
+            ))
+          ) : (
+            <option value="" disabled>No judges yet</option>
+          )}
         </select>
         <button onClick={addNewJudge} className="add-judge-btn">
           + Add New Judge
@@ -234,9 +242,9 @@ function App() {
             <input
               type="number"
               min="0"
-              max="3"
+              max="10"
               step="0.1"
-              placeholder="Enter score (0-3)"
+              placeholder="Enter score (0-10)"
               value={scoresByJudge[currentJudge]?.[index] || ""}
               onChange={(e) => handleScoreChange(index, e.target.value)}
             />
