@@ -14,6 +14,15 @@ CORS(app)  # This will allow cross-origin requests from your React app
 # Connect to the database
 DATABASE_URL = os.environ['DATABASE_URL']  # Heroku provides this as an environment variable
 
+def index():
+    # Serve the index.html file from the static folder
+    return send_from_directory(os.path.join(app.root_path, 'static'), 'index.html')
+
+# Optionally, handle any other frontend assets (like CSS or JS) directly from the static folder
+@app.route('/<path:path>')
+def serve_static(path):
+    return send_from_directory(os.path.join(app.root_path, 'static'), path)
+
 def get_db_connection():
     conn = psycopg2.connect(DATABASE_URL, sslmode='require')
     return conn
