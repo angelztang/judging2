@@ -53,44 +53,81 @@ def get_scores():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+# Endpoint to get all unique judges
+@app.route('/api/judges', methods=['GET'])
+def get_judges():
+    try:
+        judges = db.session.query(Score.judge_id).distinct().all()
+        judges_list = [judge[0] for judge in judges]
+        return jsonify(judges_list)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# Endpoint to add a new judge
+@app.route('/api/judges', methods=['POST'])
+def add_judge():
+    try:
+        data = request.get_json()
+        if not data or 'judge_id' not in data:
+            return jsonify({"error": "Missing judge_id"}), 400
+            
+        judge_id = data['judge_id']
+        
+        # Check if judge already exists
+        existing_judge = db.session.query(Score.judge_id).filter_by(judge_id=judge_id).first()
+        if existing_judge:
+            return jsonify({"error": "Judge already exists"}), 400
+            
+        # Create an initial score entry to persist the judge
+        initial_score = Score(
+            judge_id=judge_id,
+            team_id="Team 1",  # Using a placeholder team
+            score=0
+        )
+        db.session.add(initial_score)
+        db.session.commit()
+        
+        return jsonify({"message": "Judge added successfully"}), 201
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+
 # Endpoint to submit a score to the database
 @app.route('/api/scores', methods=['POST'])
 def submit_score():
     try:
         data = request.get_json()
+        print("Received score data:", data)
         
-        # Check that the data contains the necessary fields
         if not data or not all(key in data for key in ['judge_id', 'team_id', 'score']):
             return jsonify({"error": "Missing required data"}), 400
         
-        # Extract and validate the score data
         judge_id = data['judge_id']
         team_id = data['team_id']
         score = float(data['score'])
         
-        # Validate score range
         if not (0 <= score <= 3):
             return jsonify({"error": "Score must be between 0 and 3"}), 400
         
-        # Check if score already exists
+        # Check if the score exists and update instead of ignoring
         existing_score = Score.query.filter_by(judge_id=judge_id, team_id=team_id).first()
         if existing_score:
-            # Update existing score
-            print(f"Updating score for judge {judge_id} team {team_id} from {existing_score.score} to {score}")
             existing_score.score = score
-            db.session.commit()
-            return jsonify({"message": "Score updated successfully!"}), 200
+            print(f"Updating score for {judge_id}, {team_id}: {score}")
         else:
-            # Create a new Score object
-            print(f"Creating new score for judge {judge_id} team {team_id}: {score}")
             new_score = Score(judge_id=judge_id, team_id=team_id, score=score)
             db.session.add(new_score)
-            db.session.commit()
-            return jsonify({"message": "Score submitted successfully!"}), 201
+            print(f"Adding new score for {judge_id}, {team_id}: {score}")
         
-    except ValueError:
+        db.session.commit()
+        return jsonify({"message": "Score submitted successfully!"}), 201
+    
+    except ValueError as e:
+        print(f"Value error: {e}")
         return jsonify({"error": "Invalid score value"}), 400
     except Exception as e:
+        print(f"Error submitting score: {e}")
         db.session.rollback()
         return jsonify({"error": str(e)}), 500
 

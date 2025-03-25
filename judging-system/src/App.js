@@ -42,29 +42,35 @@ function App() {
       try {
         setIsLoading(true);
         console.log("Fetching initial data...");
-        const response = await fetch(`${BACKEND_URL}/api/scores`);
-        if (!response.ok) {
-          throw new Error(`Failed to fetch scores: ${await response.text()}`);
+        
+        // First fetch judges
+        const judgesResponse = await fetch(`${BACKEND_URL}/api/judges`);
+        if (!judgesResponse.ok) {
+          throw new Error(`Failed to fetch judges: ${await judgesResponse.text()}`);
         }
-        const data = await response.json();
-        console.log("Received initial data:", data);
+        const judgesData = await judgesResponse.json();
+        console.log("Received judges:", judgesData);
+        setJudges(judgesData);
 
-        // Extract and set judges immediately
-        const uniqueJudges = [...new Set(data.map(score => score.judge_id))].sort();
-        console.log("Setting initial judges:", uniqueJudges);
-        setJudges(uniqueJudges);
+        // Then fetch scores
+        const scoresResponse = await fetch(`${BACKEND_URL}/api/scores`);
+        if (!scoresResponse.ok) {
+          throw new Error(`Failed to fetch scores: ${await scoresResponse.text()}`);
+        }
+        const scoresData = await scoresResponse.json();
+        console.log("Received scores:", scoresData);
 
         // Initialize score table
         const updatedData = {};
         teams.forEach(team => {
           updatedData[team] = {};
-          uniqueJudges.forEach(judge => {
+          judgesData.forEach(judge => {
             updatedData[team][judge] = "";
           });
         });
 
         // Fill in scores
-        data.forEach(({ team_id, judge_id, score }) => {
+        scoresData.forEach(({ team_id, judge_id, score }) => {
           if (!updatedData[team_id]) {
             updatedData[team_id] = {};
           }
@@ -75,8 +81,8 @@ function App() {
 
         // Set seen teams
         const seenTeams = {};
-        uniqueJudges.forEach(judge => {
-          seenTeams[judge] = data
+        judgesData.forEach(judge => {
+          seenTeams[judge] = scoresData
             .filter(score => score.judge_id === judge)
             .map(score => score.team_id);
         });
@@ -84,13 +90,13 @@ function App() {
 
         // Set team assignments
         const assignments = {};
-        data.forEach(({ team_id }) => {
+        scoresData.forEach(({ team_id }) => {
           assignments[team_id] = (assignments[team_id] || 0) + 1;
         });
         setTeamAssignments(assignments);
 
         // Set judged teams
-        setJudgedTeams(new Set(data.map(score => score.team_id)));
+        setJudgedTeams(new Set(scoresData.map(score => score.team_id)));
 
       } catch (error) {
         console.error("Error loading initial data:", error);
@@ -138,11 +144,36 @@ function App() {
     setCurrentJudge(event.target.value);
   };
 
-  const addNewJudge = () => {
+  const addNewJudge = async () => {
     const newJudge = prompt("Enter your name:");
     if (newJudge && !judges.includes(newJudge)) {
-      setJudges([...judges, newJudge]);
-      setCurrentJudge(newJudge);
+      try {
+        // Add the judge to the backend
+        const response = await fetch(`${BACKEND_URL}/api/judges`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ judge_id: newJudge })
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || 'Failed to add judge');
+        }
+
+        // Add the judge to the frontend state
+        setJudges([...judges, newJudge]);
+        setCurrentJudge(newJudge);
+        
+        // Refresh the data to ensure everything is in sync
+        await fetchScores();
+        
+        alert('Judge added successfully!');
+      } catch (error) {
+        console.error('Error adding new judge:', error);
+        alert('Failed to add new judge: ' + error.message);
+      }
     }
   };
 
