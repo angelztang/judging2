@@ -1,549 +1,3 @@
-// import React, { useState, useEffect } from "react";
-// import "./App1.css";  // Make sure to create this CSS file
-
-// const teams = Array.from({ length: 20 }, (_, i) => `Team ${i + 1}`);
-
-// const getWeightedRandomTeams = (availableTeams, seenTeams, count, teamAssignments, judgedTeams) => {
-//   let unjudgedTeams = availableTeams.filter((team) => !judgedTeams.has(team));
-//   let judgedTeamsList = availableTeams.filter((team) => judgedTeams.has(team));
-
-//   let candidates = [...unjudgedTeams, ...judgedTeamsList].filter((team) => !seenTeams.includes(team));
-
-//   candidates.sort((a, b) => parseInt(a.split(' ')[1]) - parseInt(b.split(' ')[1]));
-
-//   let selected = new Set();
-//   let baseIndex = Math.floor(Math.random() * (candidates.length - 7));
-//   while (selected.size < count) {
-//     let randomOffset = Math.floor(Math.random() * 7); 
-//     let team = candidates[Math.min(baseIndex + randomOffset, candidates.length - 1)];
-//     if (!selected.has(team) && (teamAssignments[team] || 0) < Math.min(...Object.values(teamAssignments)) + 1) {
-//       selected.add(team);
-//     }
-//   }
-
-//   return Array.from(selected);
-// };
-
-// const BACKEND_URL = 'https://judging-system-a20f58757cfa.herokuapp.com';
-
-// function App() {
-//   const [currentTeamsByJudge, setCurrentTeamsByJudge] = useState({});
-//   const [scoresByJudge, setScoresByJudge] = useState({});
-//   const [judges, setJudges] = useState([]);
-//   const [currentJudge, setCurrentJudge] = useState("");
-//   const [seenTeamsByJudge, setSeenTeamsByJudge] = useState({});
-//   const [scoreTableData, setScoreTableData] = useState({});
-//   const [teamAssignments, setTeamAssignments] = useState({});
-//   const [judgedTeams, setJudgedTeams] = useState(new Set());
-//   const [isLoading, setIsLoading] = useState(true);
-//   const [lastAssignedTeams, setLastAssignedTeams] = useState({});
-
-//   useEffect(() => {
-//     const loadInitialData = async () => {
-//       try {
-//         setIsLoading(true);
-//         console.log("Fetching initial data...");
-        
-//         // First fetch judges
-//         const judgesResponse = await fetch(`${BACKEND_URL}/api/judges`);
-//         if (!judgesResponse.ok) {
-//           throw new Error(`Failed to fetch judges: ${await judgesResponse.text()}`);
-//         }
-//         const judgesData = await judgesResponse.json();
-//         console.log("Received judges:", judgesData);
-//         setJudges(judgesData);
-
-//         // Then fetch scores
-//         const scoresResponse = await fetch(`${BACKEND_URL}/api/scores`);
-//         if (!scoresResponse.ok) {
-//           throw new Error(`Failed to fetch scores: ${await scoresResponse.text()}`);
-//         }
-//         const scoresData = await scoresResponse.json();
-//         console.log("Received scores:", scoresData);
-
-//         // Initialize score table
-//         const updatedData = {};
-//         teams.forEach(team => {
-//           updatedData[team] = {};
-//           judgesData.forEach(judge => {
-//             updatedData[team][judge] = "";
-//           });
-//         });
-
-//         // Fill in scores
-//         scoresData.forEach(({ team_id, judge_id, score }) => {
-//           if (!updatedData[team_id]) {
-//             updatedData[team_id] = {};
-//           }
-//           updatedData[team_id][judge_id] = score;
-//         });
-
-//         setScoreTableData(updatedData);
-
-//         // Set seen teams
-//         const seenTeams = {};
-//         judgesData.forEach(judge => {
-//           seenTeams[judge] = scoresData
-//             .filter(score => score.judge_id === judge)
-//             .map(score => score.team_id);
-//         });
-//         setSeenTeamsByJudge(seenTeams);
-
-//         // Set team assignments
-//         const assignments = {};
-//         scoresData.forEach(({ team_id }) => {
-//           assignments[team_id] = (assignments[team_id] || 0) + 1;
-//         });
-//         setTeamAssignments(assignments);
-
-//         // Set judged teams
-//         setJudgedTeams(new Set(scoresData.map(score => score.team_id)));
-
-//       } catch (error) {
-//         console.error("Error loading initial data:", error);
-//         alert("Failed to load initial data. Please refresh the page.");
-//       } finally {
-//         setIsLoading(false);
-//       }
-//     };
-
-//     loadInitialData();
-//   }, []);
-
-//   useEffect(() => {
-//     if (currentJudge && !currentTeamsByJudge[currentJudge]) {
-//       assignNewTeams(currentJudge);
-//     }
-//   }, [currentJudge, currentTeamsByJudge]);
-
-//   const assignNewTeams = (judge) => {
-//     const seenTeams = seenTeamsByJudge[judge] || [];
-//     const newTeams = getWeightedRandomTeams(teams, seenTeams, 5, teamAssignments, judgedTeams);
-    
-//     // Store the assigned teams
-//     setLastAssignedTeams(prev => ({
-//       ...prev,
-//       [judge]: newTeams
-//     }));
-    
-//     setCurrentTeamsByJudge(prev => ({ ...prev, [judge]: newTeams }));
-//     setScoresByJudge(prev => ({ ...prev, [judge]: Array(5).fill("") }));
-    
-//     setTeamAssignments((prev) => {
-//       const updatedAssignments = { ...prev };
-//       newTeams.forEach(team => {
-//         updatedAssignments[team] = (updatedAssignments[team] || 0) + 1;
-//       });
-//       return updatedAssignments;
-//     });
-
-//     setJudgedTeams((prev) => new Set([...prev, ...newTeams]));
-//   };
-
-//   const handleScoreChange = (index, value) => {
-//     setScoresByJudge((prev) => ({
-//       ...prev,
-//       [currentJudge]: prev[currentJudge].map((score, i) =>
-//         i === index ? value : score
-//       ),
-//     }));
-//   };
-
-//   const handleJudgeChange = (event) => {
-//     const selectedJudge = event.target.value;
-//     console.log('Selected judge:', selectedJudge);
-//     setCurrentJudge(selectedJudge);
-    
-//     if (selectedJudge) {
-//       // Check if judge has last assigned teams
-//       if (lastAssignedTeams[selectedJudge]) {
-//         console.log('Restoring last assigned teams for judge:', selectedJudge);
-//         setCurrentTeamsByJudge(prev => ({
-//           ...prev,
-//           [selectedJudge]: lastAssignedTeams[selectedJudge]
-//         }));
-//         // Initialize empty scores for these teams if not exists
-//         if (!scoresByJudge[selectedJudge]) {
-//           setScoresByJudge(prev => ({
-//             ...prev,
-//             [selectedJudge]: Array(lastAssignedTeams[selectedJudge].length).fill("")
-//           }));
-//         }
-//       } else {
-//         // Assign new teams if no previous assignment exists
-//         console.log('Assigning new teams for judge:', selectedJudge);
-//         assignNewTeams(selectedJudge);
-//       }
-//     }
-//   };
-
-//   const updateScoreTableWithNewJudge = (judgeName, teams) => {
-//     // Update the score table to include the new judge
-//     setScoreTableData(prev => {
-//       const updated = { ...prev };
-//       teams.forEach(team => {
-//         if (!updated[team]) {
-//           updated[team] = {};
-//         }
-//         updated[team][judgeName] = "";
-//       });
-//       return updated;
-//     });
-//   };
-
-//   const addNewJudge = async () => {
-//     const newJudge = prompt("Enter your name:");
-//     if (!newJudge) return;
-    
-//     if (judges.includes(newJudge)) {
-//       alert('This judge already exists!');
-//       return;
-//     }
-
-//     try {
-//       console.log('Adding new judge:', newJudge);
-      
-//       // Immediately update UI with new judge
-//       setJudges(prev => [...prev, newJudge]);
-//       setCurrentJudge(newJudge);
-      
-//       // Assign teams immediately
-//       const newTeams = getWeightedRandomTeams(teams, [], 5, teamAssignments, judgedTeams);
-//       setCurrentTeamsByJudge(prev => ({ ...prev, [newJudge]: newTeams }));
-//       setScoresByJudge(prev => ({ ...prev, [newJudge]: Array(5).fill("") }));
-      
-//       // Update the score table display
-//       updateScoreTableWithNewJudge(newJudge, newTeams);
-      
-//       // Create initial scores for all assigned teams
-//       for (const team of newTeams) {
-//         const initialScore = {
-//           judge_id: newJudge,
-//           team_id: team,
-//           score: 0
-//         };
-        
-//         const response = await fetch(`${BACKEND_URL}/api/scores`, {
-//           method: 'POST',
-//           headers: {
-//             'Content-Type': 'application/json',
-//           },
-//           body: JSON.stringify(initialScore)
-//         });
-
-//         if (!response.ok) {
-//           throw new Error('Failed to initialize judge scores');
-//         }
-//       }
-      
-//       // Store the assigned teams
-//       setLastAssignedTeams(prev => ({
-//         ...prev,
-//         [newJudge]: newTeams
-//       }));
-      
-//       alert('Judge added successfully!');
-//     } catch (error) {
-//       console.error('Error adding new judge:', error);
-//       // Rollback local state changes
-//       setJudges(prev => prev.filter(j => j !== newJudge));
-//       setCurrentJudge("");
-//       setCurrentTeamsByJudge(prev => {
-//         const updated = { ...prev };
-//         delete updated[newJudge];
-//         return updated;
-//       });
-//       alert('Failed to add new judge. Please try again.');
-//     }
-//   };
-
-//   const handleSubmit = async () => {
-//     if (!currentJudge) {
-//       alert('Please select a judge first');
-//       return;
-//     }
-
-//     const currentTeams = currentTeamsByJudge[currentJudge] || [];
-//     const currentScores = scoresByJudge[currentJudge] || [];
-
-//     if (currentScores.some(score => score === "")) {
-//       alert('Please enter scores for all teams');
-//       return;
-//     }
-
-//     try {
-//       const newData = currentTeams.map((team, index) => ({
-//         judge_id: currentJudge,
-//         team_id: team,
-//         score: parseFloat(currentScores[index])
-//       }));
-
-//       // Submit scores and update UI immediately
-//       for (const scoreData of newData) {
-//         const response = await submitScore(scoreData);
-//         if (response.ok) {
-//           const data = await response.json();
-//           // Update score table immediately
-//           setScoreTableData(prev => ({
-//             ...prev,
-//             [scoreData.team_id]: {
-//               ...(prev[scoreData.team_id] || {}),
-//               [scoreData.judge_id]: scoreData.score
-//             }
-//           }));
-//         }
-//       }
-
-//       // Clear the last assigned teams and assign new ones
-//       setLastAssignedTeams(prev => {
-//         const updated = { ...prev };
-//         delete updated[currentJudge];
-//         return updated;
-//       });
-
-//       // Assign new teams
-//       assignNewTeams(currentJudge);
-      
-//       alert('Scores submitted successfully!');
-//     } catch (error) {
-//       console.error('Error submitting scores:', error);
-//       alert('Failed to submit scores. Please try again.');
-//     }
-//   };
-
-//   const calculateAverage = (teamScores) => {
-//     const totalScore = Object.values(teamScores).reduce(
-//       (sum, score) => sum + (parseFloat(score) || 0),
-//       0
-//     );
-//     const numJudges = Object.keys(teamScores).length;
-//     return numJudges > 0 ? (totalScore / numJudges).toFixed(2) : "";
-//   };
-
-//   const fetchScores = async () => {
-//     try {
-//       console.log("Fetching scores from:", `${BACKEND_URL}/api/scores`);
-//       const response = await fetch(`${BACKEND_URL}/api/scores`);
-//       if (!response.ok) {
-//         throw new Error(`Failed to fetch scores: ${await response.text()}`);
-//       }
-//       const data = await response.json();
-//       console.log("Received scores:", data);
-
-//       // Extract unique judges from the data
-//       const uniqueJudges = [...new Set(data.map(score => score.judge_id))].sort();
-//       console.log("Found judges:", uniqueJudges);
-
-//       // Update judges list
-//       setJudges(uniqueJudges);
-
-//       // Initialize score table with all teams and judges
-//       const updatedData = {};
-//       teams.forEach(team => {
-//         updatedData[team] = {};
-//         uniqueJudges.forEach(judge => {
-//           updatedData[team][judge] = "";
-//         });
-//       });
-
-//       // Fill in actual scores
-//       data.forEach(({ team_id, judge_id, score }) => {
-//         if (!updatedData[team_id]) {
-//           updatedData[team_id] = {};
-//         }
-//         updatedData[team_id][judge_id] = score;
-//       });
-
-//       console.log("Updated score table data:", updatedData);
-//       setScoreTableData(updatedData);
-
-//       // Update seen teams for each judge
-//       const seenTeamsByJudgeData = {};
-//       uniqueJudges.forEach(judge => {
-//         seenTeamsByJudgeData[judge] = data
-//           .filter(score => score.judge_id === judge)
-//           .map(score => score.team_id);
-//       });
-//       console.log("Seen teams by judge:", seenTeamsByJudgeData);
-//       setSeenTeamsByJudge(seenTeamsByJudgeData);
-
-//       // Update team assignments
-//       const teamAssignmentsData = {};
-//       data.forEach(({ team_id }) => {
-//         teamAssignmentsData[team_id] = (teamAssignmentsData[team_id] || 0) + 1;
-//       });
-//       setTeamAssignments(teamAssignmentsData);
-
-//       // Set judged teams
-//       setJudgedTeams(new Set(data.map(score => score.team_id)));
-
-//     } catch (error) {
-//       console.error("Error fetching scores:", error);
-//       alert("Failed to fetch scores. Please refresh the page.");
-//     }
-//   };
-
-//   return (
-//     <div className="container">
-//       <h1>Hackathon Judging System</h1>
-
-//       {isLoading ? (
-//         <div>Loading judges and scores...</div>
-//       ) : (
-//         <>
-//           <div className="select-container">
-//             <label>Select Judge: </label>
-//             <select 
-//               value={currentJudge} 
-//               onChange={handleJudgeChange}
-//               style={{ minWidth: '200px' }}  // Add some minimum width
-//             >
-//               <option value="">Select a judge</option>
-//               {judges.map((judge) => (
-//                 <option key={judge} value={judge}>
-//                   {judge}
-//                 </option>
-//               ))}
-//             </select>
-//             <button 
-//               onClick={addNewJudge} 
-//               className="add-judge-btn"
-//               style={{ marginLeft: '10px' }}  // Add some spacing
-//             >
-//               + Add New Judge
-//             </button>
-//           </div>
-
-//           {/* Show current judge for confirmation */}
-//           {currentJudge && (
-//             <div style={{ margin: '10px 0', fontWeight: 'bold' }}>
-//               Current Judge: {currentJudge}
-//             </div>
-//           )}
-
-//           <div className="team-inputs">
-//             {(currentTeamsByJudge[currentJudge] || []).map((team, index) => (
-//               <div key={team} className="team-input">
-//                 <span>{team}</span>
-//                 <input
-//                   type="number"
-//                   min="0"
-//                   max="3"
-//                   placeholder="Enter score (0-3)"
-//                   value={scoresByJudge[currentJudge]?.[index] || ""}
-//                   onChange={(e) => handleScoreChange(index, e.target.value)}
-//                   className="score-input"
-//                 />
-//               </div>
-//             ))}
-//           </div>
-
-//           {currentJudge && currentTeamsByJudge[currentJudge]?.length > 0 && (
-//             <button 
-//               onClick={handleSubmit} 
-//               className="submit-btn"
-//             >
-//               Submit Scores
-//             </button>
-//           )}
-
-//           <h2>Score Table</h2>
-//           <div className="table-container">
-//             <table>
-//               <thead>
-//                 <tr>
-//                   <th>Team</th>
-//                   {judges.map((judge) => (
-//                     <th key={judge}>{judge}</th>
-//                   ))}
-//                   <th>Average</th>
-//                 </tr>
-//               </thead>
-//               <tbody>
-//                 {teams
-//                   .sort((a, b) => {
-//                     const numA = parseInt(a.split(' ')[1]);
-//                     const numB = parseInt(b.split(' ')[1]);
-//                     return numA - numB;
-//                   })
-//                   .map(team => {
-//                     const teamScores = scoreTableData[team] || {};
-//                     return (
-//                       <tr key={team}>
-//                         <td>{team}</td>
-//                         {judges.map((judge) => (
-//                           <td key={`${team}-${judge}`}>
-//                             {teamScores[judge] || ""}
-//                           </td>
-//                         ))}
-//                         <td>{calculateAverage(teamScores)}</td>
-//                       </tr>
-//                     );
-//                   })}
-//               </tbody>
-//             </table>
-//           </div>
-
-//           {/* Add immediate feedback for new judges */}
-//           <div className="team-assignments">
-//             {currentJudge && currentTeamsByJudge[currentJudge] && (
-//               <div className="current-assignments">
-//                 <h3>Current Teams for {currentJudge}</h3>
-//                 <ul>
-//                   {currentTeamsByJudge[currentJudge].map(team => (
-//                     <li key={team}>{team}</li>
-//                   ))}
-//                 </ul>
-//               </div>
-//             )}
-//           </div>
-//         </>
-//       )}
-//     </div>
-//   );
-// }
-
-// const submitScore = async (scoreData) => {
-//   try {
-//     scoreData.score = parseFloat(scoreData.score);
-    
-//     console.log("Submitting score to:", `${BACKEND_URL}/api/scores`);
-//     console.log("Score data:", JSON.stringify(scoreData, null, 2));
-    
-//     const response = await fetch(`${BACKEND_URL}/api/scores`, {
-//       method: 'POST',
-//       headers: {
-//         'Content-Type': 'application/json',
-//         'Accept': 'application/json'
-//       },
-//       body: JSON.stringify(scoreData),
-//     });
-
-//     let responseData;
-//     try {
-//       responseData = await response.json();
-//     } catch (e) {
-//       throw new Error('Failed to parse response JSON');
-//     }
-
-//     console.log("Response status:", response.status);
-//     console.log("Response data:", responseData);
-
-//     if (response.status === 201 || response.status === 200) {
-//       console.log("Score submitted/updated successfully!");
-//       return true;
-//     }
-
-//     throw new Error(responseData.error || 'Failed to submit score');
-//   } catch (error) {
-//     console.error("Error submitting score:", error);
-//     console.error("Error details:", error.message);
-//     throw error;
-//   }
-// };
-
-// export default App;
-
 import React, { useState, useEffect } from "react";
 import "./App1.css";  // Make sure to create this CSS file
 
@@ -570,6 +24,8 @@ const getWeightedRandomTeams = (availableTeams, seenTeams, count, teamAssignment
   return Array.from(selected);
 };
 
+const BACKEND_URL = 'https://judging-system-a20f58757cfa.herokuapp.com';
+
 function App() {
   const [currentTeamsByJudge, setCurrentTeamsByJudge] = useState({});
   const [scoresByJudge, setScoresByJudge] = useState({});
@@ -578,19 +34,101 @@ function App() {
   const [seenTeamsByJudge, setSeenTeamsByJudge] = useState({});
   const [scoreTableData, setScoreTableData] = useState({});
   const [teamAssignments, setTeamAssignments] = useState({});
-  const [judgedTeams, setJudgedTeams] = useState(new Set()); // Track judged teams
+  const [judgedTeams, setJudgedTeams] = useState(new Set());
+  const [isLoading, setIsLoading] = useState(true);
+  const [lastAssignedTeams, setLastAssignedTeams] = useState({});
+
+  useEffect(() => {
+    const loadInitialData = async () => {
+      try {
+        setIsLoading(true);
+        console.log("Fetching initial data...");
+        
+        // First fetch judges
+        const judgesResponse = await fetch(`${BACKEND_URL}/api/judges`);
+        if (!judgesResponse.ok) {
+          throw new Error(`Failed to fetch judges: ${await judgesResponse.text()}`);
+        }
+        const judgesData = await judgesResponse.json();
+        console.log("Received judges:", judgesData);
+        setJudges(judgesData);
+
+        // Then fetch scores
+        const scoresResponse = await fetch(`${BACKEND_URL}/api/scores`);
+        if (!scoresResponse.ok) {
+          throw new Error(`Failed to fetch scores: ${await scoresResponse.text()}`);
+        }
+        const scoresData = await scoresResponse.json();
+        console.log("Received scores:", scoresData);
+
+        // Initialize score table
+        const updatedData = {};
+        teams.forEach(team => {
+          updatedData[team] = {};
+          judgesData.forEach(judge => {
+            updatedData[team][judge] = "";
+          });
+        });
+
+        // Fill in scores
+        scoresData.forEach(({ team_id, judge_id, score }) => {
+          if (!updatedData[team_id]) {
+            updatedData[team_id] = {};
+          }
+          updatedData[team_id][judge_id] = score;
+        });
+
+        setScoreTableData(updatedData);
+
+        // Set seen teams
+        const seenTeams = {};
+        judgesData.forEach(judge => {
+          seenTeams[judge] = scoresData
+            .filter(score => score.judge_id === judge)
+            .map(score => score.team_id);
+        });
+        setSeenTeamsByJudge(seenTeams);
+
+        // Set team assignments
+        const assignments = {};
+        scoresData.forEach(({ team_id }) => {
+          assignments[team_id] = (assignments[team_id] || 0) + 1;
+        });
+        setTeamAssignments(assignments);
+
+        // Set judged teams
+        setJudgedTeams(new Set(scoresData.map(score => score.team_id)));
+
+      } catch (error) {
+        console.error("Error loading initial data:", error);
+        alert("Failed to load initial data. Please refresh the page.");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadInitialData();
+  }, []);
 
   useEffect(() => {
     if (currentJudge && !currentTeamsByJudge[currentJudge]) {
       assignNewTeams(currentJudge);
     }
-  }, [currentJudge]);
+  }, [currentJudge, currentTeamsByJudge]);
 
   const assignNewTeams = (judge) => {
     const seenTeams = seenTeamsByJudge[judge] || [];
     const newTeams = getWeightedRandomTeams(teams, seenTeams, 5, teamAssignments, judgedTeams);
-    setCurrentTeamsByJudge((prev) => ({ ...prev, [judge]: newTeams }));
-    setScoresByJudge((prev) => ({ ...prev, [judge]: Array(5).fill("") }));
+    
+    // Store the assigned teams
+    setLastAssignedTeams(prev => ({
+      ...prev,
+      [judge]: newTeams
+    }));
+    
+    setCurrentTeamsByJudge(prev => ({ ...prev, [judge]: newTeams }));
+    setScoresByJudge(prev => ({ ...prev, [judge]: Array(5).fill("") }));
+    
     setTeamAssignments((prev) => {
       const updatedAssignments = { ...prev };
       newTeams.forEach(team => {
@@ -599,7 +137,6 @@ function App() {
       return updatedAssignments;
     });
 
-    // Update judged teams set
     setJudgedTeams((prev) => new Set([...prev, ...newTeams]));
   };
 
@@ -613,61 +150,140 @@ function App() {
   };
 
   const handleJudgeChange = (event) => {
-    setCurrentJudge(event.target.value);
-  };
-
-  const addNewJudge = () => {
-    const newJudge = prompt("Enter your name:");
-    if (newJudge && !judges.includes(newJudge)) {
-      setJudges([...judges, newJudge]);
-      setCurrentJudge(newJudge);
+    const selectedJudge = event.target.value;
+    console.log('Selected judge:', selectedJudge);
+    setCurrentJudge(selectedJudge);
+    
+    if (selectedJudge) {
+      // Check if judge has last assigned teams
+      if (lastAssignedTeams[selectedJudge]) {
+        console.log('Restoring last assigned teams for judge:', selectedJudge);
+        setCurrentTeamsByJudge(prev => ({
+          ...prev,
+          [selectedJudge]: lastAssignedTeams[selectedJudge]
+        }));
+        // Initialize empty scores for these teams if not exists
+        if (!scoresByJudge[selectedJudge]) {
+          setScoresByJudge(prev => ({
+            ...prev,
+            [selectedJudge]: Array(lastAssignedTeams[selectedJudge].length).fill("")
+          }));
+        }
+      } else {
+        // Assign new teams if no previous assignment exists
+        console.log('Assigning new teams for judge:', selectedJudge);
+        assignNewTeams(selectedJudge);
+      }
     }
   };
 
-  const handleSubmit = () => {
-    if (!currentJudge) return;
+  const addNewJudge = async () => {
+    const newJudge = prompt("Enter your name:");
+    if (!newJudge) return; // Handle cancel case
+    
+    if (judges.includes(newJudge)) {
+      alert('This judge already exists!');
+      return;
+    }
+
+    try {
+      console.log('Adding new judge:', newJudge);
+      
+      // Update local state first for immediate feedback
+      setJudges(prev => [...prev, newJudge]);
+      
+      // Create initial score to register the judge
+      const initialScore = {
+        judge_id: newJudge,
+        team_id: "Team 1",
+        score: 0
+      };
+      
+      const response = await fetch(`${BACKEND_URL}/api/scores`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(initialScore)
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to add judge');
+      }
+
+      // Immediately assign and display teams for the new judge
+      const newTeams = getWeightedRandomTeams(teams, [], 5, teamAssignments, judgedTeams);
+      console.log('Assigned teams for new judge:', newTeams);
+      
+      // Update all relevant state
+      setCurrentJudge(newJudge);
+      setCurrentTeamsByJudge(prev => ({ ...prev, [newJudge]: newTeams }));
+      setScoresByJudge(prev => ({ ...prev, [newJudge]: Array(5).fill("") }));
+      setLastAssignedTeams(prev => ({ ...prev, [newJudge]: newTeams }));
+      
+      // Update score table to include the new judge
+      setScoreTableData(prev => {
+        const updated = { ...prev };
+        teams.forEach(team => {
+          if (!updated[team]) {
+            updated[team] = {};
+          }
+          updated[team][newJudge] = "";
+        });
+        return updated;
+      });
+      
+      alert('Judge added successfully! You can now enter scores for your assigned teams.');
+    } catch (error) {
+      console.error('Error adding new judge:', error);
+      // Rollback local state changes
+      setJudges(prev => prev.filter(j => j !== newJudge));
+      setCurrentJudge("");
+      alert('Failed to add new judge. Please try again.');
+    }
+  };
+
+  const handleSubmit = async () => {
+    if (!currentJudge) {
+      alert('Please select a judge first');
+      return;
+    }
 
     const currentTeams = currentTeamsByJudge[currentJudge] || [];
     const currentScores = scoresByJudge[currentJudge] || [];
 
-    // Check if the team has already been judged by this judge
-    const newData = currentTeams.map((team, index) => {
-      const existingScore = scoreTableData[team]?.[currentJudge];
-      // If there's already a score for this team by the current judge, discard the new score
-      if (existingScore !== undefined) {
-        return {
-          Team: team,
-          Judge: currentJudge,
-          Score: existingScore, // Keep the existing score
-        };
-      } else {
-        return {
-          Team: team,
-          Judge: currentJudge,
-          Score: currentScores[index], // Use the new score if it's the first time
-        };
+    if (currentScores.some(score => score === "")) {
+      alert('Please enter scores for all teams');
+      return;
+    }
+
+    try {
+      const newData = currentTeams.map((team, index) => ({
+        judge_id: currentJudge,
+        team_id: team,
+        score: parseFloat(currentScores[index])
+      }));
+
+      // Submit all scores
+      for (const scoreData of newData) {
+        await submitScore(scoreData);
       }
-    });
 
-    setScoreTableData((prevData) => {
-      const updatedData = { ...prevData };
-
-      newData.forEach(({ Team, Judge, Score }) => {
-        if (!updatedData[Team]) {
-          updatedData[Team] = {};
-        }
-        updatedData[Team][Judge] = Score;
+      // Clear the last assigned teams for this judge
+      setLastAssignedTeams(prev => {
+        const updated = { ...prev };
+        delete updated[currentJudge];
+        return updated;
       });
 
-      return updatedData;
-    });
-
-    setSeenTeamsByJudge((prev) => ({
-      ...prev,
-      [currentJudge]: [...(prev[currentJudge] || []), ...currentTeams],
-    }));
-
-    assignNewTeams(currentJudge);
+      // Assign new teams
+      assignNewTeams(currentJudge);
+      
+      alert('Scores submitted successfully!');
+    } catch (error) {
+      console.error('Error submitting scores:', error);
+      alert('Failed to submit scores. Please try again.');
+    }
   };
 
   const calculateAverage = (teamScores) => {
@@ -679,104 +295,217 @@ function App() {
     return numJudges > 0 ? (totalScore / numJudges).toFixed(2) : "";
   };
 
+  const fetchScores = async () => {
+    try {
+      console.log("Fetching scores from:", `${BACKEND_URL}/api/scores`);
+      const response = await fetch(`${BACKEND_URL}/api/scores`);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch scores: ${await response.text()}`);
+      }
+      const data = await response.json();
+      console.log("Received scores:", data);
+
+      // Extract unique judges from the data
+      const uniqueJudges = [...new Set(data.map(score => score.judge_id))].sort();
+      console.log("Found judges:", uniqueJudges);
+
+      // Update judges list
+      setJudges(uniqueJudges);
+
+      // Initialize score table with all teams and judges
+      const updatedData = {};
+      teams.forEach(team => {
+        updatedData[team] = {};
+        uniqueJudges.forEach(judge => {
+          updatedData[team][judge] = "";
+        });
+      });
+
+      // Fill in actual scores
+      data.forEach(({ team_id, judge_id, score }) => {
+        if (!updatedData[team_id]) {
+          updatedData[team_id] = {};
+        }
+        updatedData[team_id][judge_id] = score;
+      });
+
+      console.log("Updated score table data:", updatedData);
+      setScoreTableData(updatedData);
+
+      // Update seen teams for each judge
+      const seenTeamsByJudgeData = {};
+      uniqueJudges.forEach(judge => {
+        seenTeamsByJudgeData[judge] = data
+          .filter(score => score.judge_id === judge)
+          .map(score => score.team_id);
+      });
+      console.log("Seen teams by judge:", seenTeamsByJudgeData);
+      setSeenTeamsByJudge(seenTeamsByJudgeData);
+
+      // Update team assignments
+      const teamAssignmentsData = {};
+      data.forEach(({ team_id }) => {
+        teamAssignmentsData[team_id] = (teamAssignmentsData[team_id] || 0) + 1;
+      });
+      setTeamAssignments(teamAssignmentsData);
+
+      // Set judged teams
+      setJudgedTeams(new Set(data.map(score => score.team_id)));
+
+    } catch (error) {
+      console.error("Error fetching scores:", error);
+      alert("Failed to fetch scores. Please refresh the page.");
+    }
+  };
+
   return (
     <div className="container">
       <h1>Hackathon Judging System</h1>
 
-      <div className="select-container">
-        <label>Select Judge: </label>
-        <select value={currentJudge} onChange={handleJudgeChange}>
-          {judges.length === 0 ? (
-            <option value="">No judges yet</option>
-          ) : (
-            judges.map((judge) => (
-              <option key={judge} value={judge}>
-                {judge}
-              </option>
-            ))
-          )}
-        </select>
-        <button onClick={addNewJudge} className="add-judge-btn">
-          + Add New Judge
-        </button>
-      </div>
-
-      <div className="team-inputs">
-        {(currentTeamsByJudge[currentJudge] || []).map((team, index) => (
-          <div key={team} className="team-input">
-            <span>{team}</span>
-            <input
-              type="number"
-              placeholder="Enter score"
-              value={scoresByJudge[currentJudge]?.[index] || ""}
-              onChange={(e) => handleScoreChange(index, e.target.value)}
-            />
-          </div>
-        ))}
-      </div>
-
-      <button onClick={handleSubmit} className="submit-btn">
-        Submit Scores
-      </button>
-
-      <h2>Score Table</h2>
-      <div className="table-container">
-        <table>
-          <thead>
-            <tr>
-              <th>Team</th>
+      {isLoading ? (
+        <div>Loading judges and scores...</div>
+      ) : (
+        <>
+          <div className="select-container">
+            <label>Select Judge: </label>
+            <select 
+              value={currentJudge} 
+              onChange={handleJudgeChange}
+              style={{ minWidth: '200px' }}
+            >
+              <option value="">Select a judge</option>
               {judges.map((judge) => (
-                <th key={judge}>{judge}</th>
+                <option key={judge} value={judge}>
+                  {judge}
+                </option>
               ))}
-              <th>Average</th>
-            </tr>
-          </thead>
-          <tbody>
-            {Object.entries(scoreTableData).map(([team, teamScores]) => (
-              <tr key={team}>
-                <td>{team}</td>
-                {judges.map((judge) => (
-                  <td key={`${team}-${judge}`}>{teamScores[judge] || ""}</td>
+            </select>
+            <button 
+              onClick={addNewJudge} 
+              className="add-judge-btn"
+              style={{ marginLeft: '10px' }}
+            >
+              + Add New Judge
+            </button>
+          </div>
+
+          {/* Show current judge and their teams */}
+          {currentJudge && (
+            <div style={{ margin: '20px 0', padding: '15px', backgroundColor: '#f5f5f5', borderRadius: '5px' }}>
+              <div style={{ fontWeight: 'bold', marginBottom: '10px' }}>
+                Current Judge: {currentJudge}
+              </div>
+              <div style={{ marginBottom: '15px' }}>
+                Your assigned teams:
+              </div>
+              <div className="team-inputs">
+                {(currentTeamsByJudge[currentJudge] || []).map((team, index) => (
+                  <div key={team} className="team-input" style={{ margin: '10px 0' }}>
+                    <span style={{ marginRight: '10px', fontWeight: 'bold' }}>{team}</span>
+                    <input
+                      type="number"
+                      min="0"
+                      max="3"
+                      placeholder="Enter score (0-3)"
+                      value={scoresByJudge[currentJudge]?.[index] || ""}
+                      onChange={(e) => handleScoreChange(index, e.target.value)}
+                      className="score-input"
+                      style={{ padding: '5px' }}
+                    />
+                  </div>
                 ))}
-                <td>{calculateAverage(teamScores)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+              </div>
+              {currentTeamsByJudge[currentJudge]?.length > 0 && (
+                <button 
+                  onClick={handleSubmit} 
+                  className="submit-btn"
+                  style={{ marginTop: '15px', padding: '8px 15px', backgroundColor: '#4CAF50', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                >
+                  Submit Scores
+                </button>
+              )}
+            </div>
+          )}
+
+          <h2>Score Table</h2>
+          <div className="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Team</th>
+                  {judges.map((judge) => (
+                    <th key={judge}>{judge}</th>
+                  ))}
+                  <th>Average</th>
+                </tr>
+              </thead>
+              <tbody>
+                {teams
+                  .sort((a, b) => {
+                    const numA = parseInt(a.split(' ')[1]);
+                    const numB = parseInt(b.split(' ')[1]);
+                    return numA - numB;
+                  })
+                  .map(team => {
+                    const teamScores = scoreTableData[team] || {};
+                    return (
+                      <tr key={team}>
+                        <td>{team}</td>
+                        {judges.map((judge) => (
+                          <td key={`${team}-${judge}`}>
+                            {teamScores[judge] || ""}
+                          </td>
+                        ))}
+                        <td>{calculateAverage(teamScores)}</td>
+                      </tr>
+                    );
+                  })}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
     </div>
   );
 }
 
 const submitScore = async (scoreData) => {
   try {
-    const response = await fetch('https://judging-system-a20f58757cfa.herokuapp.com//api/scores', {
+    scoreData.score = parseFloat(scoreData.score);
+    
+    console.log("Submitting score to:", `${BACKEND_URL}/api/scores`);
+    console.log("Score data:", JSON.stringify(scoreData, null, 2));
+    
+    const response = await fetch(`${BACKEND_URL}/api/scores`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Accept': 'application/json'
       },
       body: JSON.stringify(scoreData),
     });
 
-    if (response.ok) {
-      console.log("Score submitted successfully!");
-    } else {
-      console.error("Failed to submit score");
+    let responseData;
+    try {
+      responseData = await response.json();
+    } catch (e) {
+      throw new Error('Failed to parse response JSON');
     }
+
+    console.log("Response status:", response.status);
+    console.log("Response data:", responseData);
+
+    if (response.status === 201 || response.status === 200) {
+      console.log("Score submitted/updated successfully!");
+      return true;
+    }
+
+    throw new Error(responseData.error || 'Failed to submit score');
   } catch (error) {
     console.error("Error submitting score:", error);
+    console.error("Error details:", error.message);
+    throw error;
   }
 };
-
-const fetchScores = async () => {
-  try {
-    const response = await fetch('https://judging-system-a20f58757cfa.herokuapp.com//api/scores');
-    const data = await response.json();
-    console.log(data); // Use the data to populate the UI
-  } catch (error) {
-    console.error("Error fetching scores:", error);
-  }
-};
-
 
 export default App;

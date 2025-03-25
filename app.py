@@ -70,17 +70,6 @@ def get_scores():
         print(f"Error fetching scores: {e}")  # Add logging
         return jsonify({"error": str(e)}), 500
 
-@app.route('/api/judges', methods=['GET'])
-def get_judges():
-    try:
-        judges = db.session.query(Score.judge_id).distinct().all()
-        judges_list = [judge[0] for judge in judges]
-        print("Fetched judges:", judges_list)  # Add logging
-        return jsonify(judges_list)
-    except Exception as e:
-        print(f"Error fetching judges: {e}")  # Add logging
-        return jsonify({"error": str(e)}), 500
-
 @app.route('/api/scores', methods=['POST'])
 def submit_score():
     try:
@@ -94,23 +83,21 @@ def submit_score():
         team_id = data['team_id']
         score = float(data['score'])
         
-        # Change score range to match frontend (0-3)
-        if not (0 <= score <= 3):
-            return jsonify({"error": "Score must be between 0 and 3"}), 400
+        if not (0 <= score <= 10):
+            return jsonify({"error": "Score must be between 0 and 10"}), 400
         
-        # Check if the score exists and update instead of ignoring
+        # Only add the score if it doesn't exist
         existing_score = Score.query.filter_by(judge_id=judge_id, team_id=team_id).first()
-        if existing_score:
-            existing_score.score = score
-            print(f"Updating score for {judge_id}, {team_id}: {score}")
-        else:
+        if not existing_score:
             new_score = Score(judge_id=judge_id, team_id=team_id, score=score)
             db.session.add(new_score)
             print(f"Adding new score for {judge_id}, {team_id}: {score}")
+            db.session.commit()
+            return jsonify({"message": "Score submitted successfully!"}), 201
+        else:
+            print(f"Ignoring duplicate score for {judge_id}, {team_id}")
+            return jsonify({"message": "Score already exists, ignoring duplicate"}), 200
         
-        db.session.commit()
-        return jsonify({"message": "Score submitted successfully!"}), 201
-    
     except ValueError as e:
         print(f"Value error: {e}")
         return jsonify({"error": "Invalid score value"}), 400
