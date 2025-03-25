@@ -78,41 +78,33 @@ function App() {
     }
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!currentJudge) return;
 
     const currentTeams = currentTeamsByJudge[currentJudge] || [];
     const currentScores = scoresByJudge[currentJudge] || [];
 
-    // Check if the team has already been judged by this judge
     const newData = currentTeams.map((team, index) => {
       const existingScore = scoreTableData[team]?.[currentJudge];
-      // If there's already a score for this team by the current judge, discard the new score
-      if (existingScore !== undefined) {
-        return {
-          Team: team,
-          Judge: currentJudge,
-          Score: existingScore, // Keep the existing score
-        };
-      } else {
-        return {
-          Team: team,
-          Judge: currentJudge,
-          Score: currentScores[index], // Use the new score if it's the first time
-        };
-      }
+      return {
+        Team: team,
+        Judge: currentJudge,
+        Score: existingScore !== undefined ? existingScore : currentScores[index],
+      };
     });
 
+    // Submit the score data to the backend
+    newData.forEach(submitScore);  // Submitting to the backend
+
+    // Update state with new data
     setScoreTableData((prevData) => {
       const updatedData = { ...prevData };
-
       newData.forEach(({ Team, Judge, Score }) => {
         if (!updatedData[Team]) {
           updatedData[Team] = {};
         }
         updatedData[Team][Judge] = Score;
       });
-
       return updatedData;
     });
 
@@ -131,6 +123,29 @@ function App() {
     );
     const numJudges = Object.keys(teamScores).length;
     return numJudges > 0 ? (totalScore / numJudges).toFixed(2) : "";
+  };
+
+  useEffect(() => {
+    fetchScores();  // Fetch scores when the component loads
+  }, []);
+
+  const fetchScores = async () => {
+    try {
+      const response = await fetch('https://judging-system-a20f58757cfa.herokuapp.com/api/scores');
+      const data = await response.json();
+      console.log(data); // Use the data to populate the UI
+
+      // Update the scoreTableData with the fetched scores
+      const updatedData = {};
+      data.forEach((scoreEntry) => {
+        const { Team, Judge, Score } = scoreEntry;
+        if (!updatedData[Team]) updatedData[Team] = {};
+        updatedData[Team][Judge] = Score;
+      });
+      setScoreTableData(updatedData); // Set the fetched scores
+    } catch (error) {
+      console.error("Error fetching scores:", error);
+    }
   };
 
   return (
@@ -201,5 +216,25 @@ function App() {
     </div>
   );
 }
+
+const submitScore = async (scoreData) => {
+  try {
+    const response = await fetch('https://judging-system-a20f58757cfa.herokuapp.com/api/scores', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(scoreData),
+    });
+
+    if (response.ok) {
+      console.log("Score submitted successfully!");
+    } else {
+      console.error("Failed to submit score");
+    }
+  } catch (error) {
+    console.error("Error submitting score:", error);
+  }
+};
 
 export default App;
