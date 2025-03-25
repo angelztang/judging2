@@ -114,43 +114,34 @@ def add_judge():
 # Endpoint to submit a score to the database
 @app.route('/api/scores', methods=['POST'])
 def submit_score():
+    data = request.json
+    judge = data.get('judge')
+    scores = data.get('scores')
+    
+    # Validate scores
+    for team, score in scores.items():
+        try:
+            score_value = float(score)
+            if not (0 <= score_value <= 3):
+                return jsonify({'error': 'Scores must be between 0 and 3'}), 400
+        except (ValueError, TypeError):
+            return jsonify({'error': 'Invalid score format'}), 400
+    
+    # If validation passes, proceed with saving scores
+    for team, score in scores.items():
+        score_entry = Score(
+            judge_id=judge,
+            team_id=team,
+            score=float(score)
+        )
+        db.session.add(score_entry)
+    
     try:
-        data = request.json
-        if not data:
-            return jsonify({'error': 'No data provided'}), 400
-            
-        print(f"Received score submission: {data}")  # Debug log
-        
-        judge = data.get('judge')
-        scores = data.get('scores')
-        
-        if not judge or not scores:
-            return jsonify({'error': 'Missing judge or scores'}), 400
-            
-        # Process and save scores...
-        for team, score in scores.items():
-            try:
-                score_value = float(score)
-                if not (0 <= score_value <= 3):
-                    return jsonify({'error': f'Invalid score {score_value} for team {team}'}), 400
-                    
-                score_entry = Score(
-                    judge_id=judge,
-                    team_id=team,
-                    score=score_value
-                )
-                db.session.add(score_entry)
-            except ValueError:
-                return jsonify({'error': f'Invalid score format for team {team}'}), 400
-                
         db.session.commit()
-        print("Scores saved successfully")  # Debug log
         return jsonify({'message': 'Scores submitted successfully'}), 200
-        
     except Exception as e:
         db.session.rollback()
-        print(f"Error in submit_score: {str(e)}")  # Debug log
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': 'Failed to save scores'}), 500
 
 # Add a health check endpoint
 @app.route('/api/health', methods=['GET'])
