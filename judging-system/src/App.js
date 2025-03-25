@@ -36,6 +36,7 @@ function App() {
   const [teamAssignments, setTeamAssignments] = useState({});
   const [judgedTeams, setJudgedTeams] = useState(new Set());
   const [isLoading, setIsLoading] = useState(true);
+  const [lastAssignedTeams, setLastAssignedTeams] = useState({});
 
   useEffect(() => {
     const loadInitialData = async () => {
@@ -118,8 +119,16 @@ function App() {
   const assignNewTeams = (judge) => {
     const seenTeams = seenTeamsByJudge[judge] || [];
     const newTeams = getWeightedRandomTeams(teams, seenTeams, 5, teamAssignments, judgedTeams);
-    setCurrentTeamsByJudge((prev) => ({ ...prev, [judge]: newTeams }));
-    setScoresByJudge((prev) => ({ ...prev, [judge]: Array(5).fill("") }));
+    
+    // Store the assigned teams
+    setLastAssignedTeams(prev => ({
+      ...prev,
+      [judge]: newTeams
+    }));
+    
+    setCurrentTeamsByJudge(prev => ({ ...prev, [judge]: newTeams }));
+    setScoresByJudge(prev => ({ ...prev, [judge]: Array(5).fill("") }));
+    
     setTeamAssignments((prev) => {
       const updatedAssignments = { ...prev };
       newTeams.forEach(team => {
@@ -143,67 +152,76 @@ function App() {
   const handleJudgeChange = (event) => {
     const selectedJudge = event.target.value;
     console.log('Selected judge:', selectedJudge);
-    
-    // Force immediate update of current judge
     setCurrentJudge(selectedJudge);
     
-    // Ensure teams are assigned for the selected judge
     if (selectedJudge) {
-      console.log('Assigning teams for judge:', selectedJudge);
-      assignNewTeams(selectedJudge);
+      // Check if judge has last assigned teams
+      if (lastAssignedTeams[selectedJudge]) {
+        console.log('Restoring last assigned teams for judge:', selectedJudge);
+        setCurrentTeamsByJudge(prev => ({
+          ...prev,
+          [selectedJudge]: lastAssignedTeams[selectedJudge]
+        }));
+        // Initialize empty scores for these teams if not exists
+        if (!scoresByJudge[selectedJudge]) {
+          setScoresByJudge(prev => ({
+            ...prev,
+            [selectedJudge]: Array(lastAssignedTeams[selectedJudge].length).fill("")
+          }));
+        }
+      } else {
+        // Assign new teams if no previous assignment exists
+        console.log('Assigning new teams for judge:', selectedJudge);
+        assignNewTeams(selectedJudge);
+      }
     }
   };
 
   const addNewJudge = async () => {
     const newJudge = prompt("Enter your name:");
-    if (newJudge && !judges.includes(newJudge)) {
-      try {
-        console.log('Adding new judge:', newJudge);
-        
-        // Update local state immediately for instant feedback
-        setJudges(prev => [...prev, newJudge]);
-        setCurrentJudge(newJudge);
-        
-        // Initialize empty data structures for the new judge
-        setCurrentTeamsByJudge(prev => ({ ...prev, [newJudge]: [] }));
-        setScoresByJudge(prev => ({ ...prev, [newJudge]: [] }));
-        setSeenTeamsByJudge(prev => ({ ...prev, [newJudge]: [] }));
-        
-        // Create initial score to persist the judge
-        const initialScore = {
-          judge_id: newJudge,
-          team_id: "Team 1",
-          score: 0
-        };
-        
-        const response = await fetch(`${BACKEND_URL}/api/scores`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-          },
-          body: JSON.stringify(initialScore)
-        });
+    if (!newJudge) return; // Handle cancel case
+    
+    if (judges.includes(newJudge)) {
+      alert('This judge already exists!');
+      return;
+    }
 
-        if (!response.ok) {
-          const error = await response.json();
-          throw new Error(error.error || 'Failed to add judge');
-        }
+    try {
+      console.log('Adding new judge:', newJudge);
+      
+      // Update local state first for immediate feedback
+      setJudges(prev => [...prev, newJudge]);
+      setCurrentJudge(newJudge);
+      
+      // Create initial score to register the judge
+      const initialScore = {
+        judge_id: newJudge,
+        team_id: "Team 1",
+        score: 0
+      };
+      
+      const response = await fetch(`${BACKEND_URL}/api/scores`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(initialScore)
+      });
 
-        // Assign teams for the new judge
-        assignNewTeams(newJudge);
-        
-        // Fetch latest data to ensure everything is in sync
-        await fetchScores();
-        
-        alert('Judge added successfully!');
-      } catch (error) {
-        console.error('Error adding new judge:', error);
-        // Remove the judge from local state if the server request failed
-        setJudges(prev => prev.filter(j => j !== newJudge));
-        setCurrentJudge("");
-        alert('Failed to add new judge: ' + error.message);
+      if (!response.ok) {
+        throw new Error('Failed to add judge');
       }
+
+      // Assign first set of teams
+      assignNewTeams(newJudge);
+      
+      alert('Judge added successfully!');
+    } catch (error) {
+      console.error('Error adding new judge:', error);
+      // Rollback local state changes
+      setJudges(prev => prev.filter(j => j !== newJudge));
+      setCurrentJudge("");
+      alert('Failed to add new judge. Please try again.');
     }
   };
 
@@ -221,50 +239,32 @@ function App() {
       return;
     }
 
-    const invalidScores = currentScores.some(score => {
-      const numScore = parseFloat(score);
-      return isNaN(numScore) || numScore < 0 || numScore > 3;
-    });
-
-    if (invalidScores) {
-      alert('Please enter valid scores between 0 and 3 for all teams');
-      return;
-    }
-
     try {
-      console.log('Current judge:', currentJudge);
-      console.log('Current teams:', currentTeams);
-      console.log('Current scores:', currentScores);
-
       const newData = currentTeams.map((team, index) => ({
         judge_id: currentJudge,
         team_id: team,
         score: parseFloat(currentScores[index])
       }));
 
-      console.log('Submitting scores:', newData);
-      
-      // Submit scores one at a time to avoid race conditions
+      // Submit all scores
       for (const scoreData of newData) {
         await submitScore(scoreData);
       }
-      
-      // Fetch latest data
-      await fetchScores();
 
-      // Update seen teams
-      setSeenTeamsByJudge(prev => ({
-        ...prev,
-        [currentJudge]: [...new Set([...(prev[currentJudge] || []), ...currentTeams])]
-      }));
+      // Clear the last assigned teams for this judge
+      setLastAssignedTeams(prev => {
+        const updated = { ...prev };
+        delete updated[currentJudge];
+        return updated;
+      });
 
       // Assign new teams
       assignNewTeams(currentJudge);
       
-      alert('All scores submitted successfully!');
+      alert('Scores submitted successfully!');
     } catch (error) {
       console.error('Error submitting scores:', error);
-      alert('Failed to submit scores. Please try again. Error: ' + error.message);
+      alert('Failed to submit scores. Please try again.');
     }
   };
 
