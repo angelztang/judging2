@@ -70,8 +70,8 @@ def submit_score():
         score = float(data['score'])
         
         # Validate score range
-        if not (0 <= score <= 10):
-            return jsonify({"error": "Score must be between 0 and 10"}), 400
+        if not (0 <= score <= 3):
+            return jsonify({"error": "Score must be between 0 and 3"}), 400
         
         # Check if score already exists
         existing_score = Score.query.filter_by(judge_id=judge_id, team_id=team_id).first()
