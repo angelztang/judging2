@@ -164,27 +164,57 @@ function App() {
       const data = await response.json();
       console.log("Received scores:", data);
 
-      // Extract unique judges from the data
+      // Extract unique judges and teams from the data
       const uniqueJudges = new Set(data.map(score => score.judge_id));
+      const uniqueTeams = new Set(data.map(score => score.team_id));
       console.log("Found judges:", Array.from(uniqueJudges));
+      console.log("Found teams:", Array.from(uniqueTeams));
 
-      // Update judges list with any new judges
-      setJudges(prevJudges => {
-        const newJudges = Array.from(uniqueJudges).filter(judge => !prevJudges.includes(judge));
-        console.log("Adding new judges:", newJudges);
-        return [...prevJudges, ...newJudges];
+      // Update judges list with all judges from database
+      const allJudges = Array.from(uniqueJudges);
+      console.log("Setting judges to:", allJudges);
+      setJudges(allJudges);
+
+      // Initialize score table with all teams
+      const updatedData = {};
+      teams.forEach(team => {
+        updatedData[team] = {};
+        allJudges.forEach(judge => {
+          updatedData[team][judge] = ""; // Initialize all scores as empty string
+        });
       });
 
-      // Update the scoreTableData with the fetched scores
-      const updatedData = {};
+      // Fill in the actual scores from the database
       data.forEach((scoreEntry) => {
         const { team_id, judge_id, score } = scoreEntry;
-        if (!updatedData[team_id]) updatedData[team_id] = {};
         updatedData[team_id][judge_id] = score;
       });
       
       console.log("Updated score table data:", updatedData);
       setScoreTableData(updatedData);
+
+      // Update judged teams set
+      setJudgedTeams(new Set(Array.from(uniqueTeams)));
+
+      // Update seen teams for each judge
+      const seenTeamsByJudgeData = {};
+      data.forEach((scoreEntry) => {
+        const { team_id, judge_id } = scoreEntry;
+        if (!seenTeamsByJudgeData[judge_id]) {
+          seenTeamsByJudgeData[judge_id] = [];
+        }
+        seenTeamsByJudgeData[judge_id].push(team_id);
+      });
+      setSeenTeamsByJudge(seenTeamsByJudgeData);
+
+      // Update team assignments
+      const teamAssignmentsData = {};
+      data.forEach((scoreEntry) => {
+        const { team_id } = scoreEntry;
+        teamAssignmentsData[team_id] = (teamAssignmentsData[team_id] || 0) + 1;
+      });
+      setTeamAssignments(teamAssignmentsData);
+
     } catch (error) {
       console.error("Error fetching scores:", error);
       alert("Failed to fetch scores. Please refresh the page.");
@@ -198,15 +228,12 @@ function App() {
       <div className="select-container">
         <label>Select Judge: </label>
         <select value={currentJudge} onChange={handleJudgeChange}>
-          {judges.length === 0 ? (
-            <option value="">No judges yet</option>
-          ) : (
-            judges.map((judge) => (
-              <option key={judge} value={judge}>
-                {judge}
-              </option>
-            ))
-          )}
+          <option value="">Select a judge</option>
+          {judges.map((judge) => (
+            <option key={judge} value={judge}>
+              {judge}
+            </option>
+          ))}
         </select>
         <button onClick={addNewJudge} className="add-judge-btn">
           + Add New Judge
@@ -244,15 +271,23 @@ function App() {
             </tr>
           </thead>
           <tbody>
-            {Object.entries(scoreTableData).map(([team, teamScores]) => (
-              <tr key={team}>
-                <td>{team}</td>
-                {judges.map((judge) => (
-                  <td key={`${team}-${judge}`}>{teamScores[judge] || ""}</td>
-                ))}
-                <td>{calculateAverage(teamScores)}</td>
-              </tr>
-            ))}
+            {Object.entries(scoreTableData)
+              .sort(([teamA], [teamB]) => {
+                const numA = parseInt(teamA.split(' ')[1]);
+                const numB = parseInt(teamB.split(' ')[1]);
+                return numA - numB;
+              })
+              .map(([team, teamScores]) => (
+                <tr key={team}>
+                  <td>{team}</td>
+                  {judges.map((judge) => (
+                    <td key={`${team}-${judge}`}>
+                      {teamScores[judge] !== null ? teamScores[judge] : ""}
+                    </td>
+                  ))}
+                  <td>{calculateAverage(teamScores)}</td>
+                </tr>
+              ))}
           </tbody>
         </table>
       </div>
