@@ -69,7 +69,6 @@ function App() {
     fetchJudges();
   }, []);
 
-  // Load initial data
   useEffect(() => {
     const loadData = async () => {
       try {
@@ -242,40 +241,10 @@ function App() {
           continue; // Continue with other scores even if one fails
         }
       }
-
-      // Update seen teams (only add teams that weren't previously seen)
-      setSeenTeamsByJudge(prev => {
-        const prevTeams = new Set(prev[currentJudge] || []);
-        const newTeams = currentTeams.filter(team => !prevTeams.has(team));
-        return {
-          ...prev,
-          [currentJudge]: [...prevTeams, ...newTeams]
-        };
-      });
-
-      // Assign new teams, excluding current teams to avoid duplicates
-      const newTeams = getWeightedRandomTeams(
-        teams, 
-        seenTeamsByJudge[currentJudge] || [], 
-        5
-      );
-      setCurrentTeamsByJudge(prev => ({ ...prev, [currentJudge]: newTeams }));
-      setScoresByJudge(prev => ({ ...prev, [currentJudge]: Array(5).fill("") }));
-
-      alert('Scores submitted successfully!');
     } catch (error) {
       console.error("Error submitting scores:", error);
-      alert('Some scores may not have been submitted. Please check the score table.');
-      // Don't freeze - still allow continuing
+      alert("Failed to submit scores. Please try again.");
     }
-  };
-
-  // Add or update the average calculation function
-  const calculateAverage = (teamScores) => {
-    const scores = Object.values(teamScores).filter(score => score !== undefined);
-    if (scores.length === 0) return "";
-    const sum = scores.reduce((a, b) => a + b, 0);
-    return (sum / scores.length).toFixed(2);
   };
 
   return (
@@ -359,29 +328,29 @@ function App() {
             </button>
           </div>
 
-          <div className="team-inputs">
-            {(currentTeamsByJudge[currentJudge] || [])
-              .filter(team => team !== "Team 0")  // Hide Team 0 from input interface
-              .map((team, index) => (
-              <div key={team} className="team-input">
-                <span>{team}</span>
-                <input
-                  type="number"
-                  min="0"
-                  max="3"
-                  step="0.1"
-                  placeholder="Score (0-3)"
-                  value={scoresByJudge[currentJudge]?.[index] || ""}
-                  onChange={(e) => handleScoreChange(index, e.target.value)}
-                />
-              </div>
-            ))}
-          </div>
-
           {currentJudge && (
-            <button onClick={handleSubmit} className="submit-btn">
-              Submit Scores
-            </button>
+            <form onSubmit={handleSubmit}>
+              <div className="team-inputs">
+                {(currentTeamsByJudge[currentJudge] || [])
+                  .filter(team => team !== "Team 0")  // Hide Team 0 from input interface
+                  .map((team, index) => (
+                    <div key={team} className="team-input">
+                      <span>{team}:</span>
+                      <input
+                        type="number"
+                        min="0"
+                        max="3"
+                        step="0.1"
+                        placeholder="Score (0-3)"
+                        value={scoresByJudge[currentJudge]?.[index] || ""}
+                        onChange={(e) => handleScoreChange(index, e.target.value)}
+                      />
+                    </div>
+                  ))}
+              </div>
+
+              <button type="submit" className="submit-btn">Submit Scores</button>
+            </form>
           )}
 
           <h2>Score Table</h2>
@@ -439,61 +408,42 @@ function App() {
           </div>
         </>
       )}
+
+      <h2>All Scores</h2>
+      <div className="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>Team</th>
+              {judges.map(judge => (
+                <th key={judge}>{judge}</th>
+              ))}
+              <th>Average</th>
+            </tr>
+          </thead>
+          <tbody>
+            {teams.map(team => (
+              <tr key={team}>
+                <td>{team}</td>
+                {judges.map(judge => {
+                  const score = allScores.find(s => s.judge === judge && s.team === team);
+                  return <td key={judge}>{score ? score.score : '-'}</td>;
+                })}
+                <td>
+                  {(() => {
+                    const teamScores = allScores.filter(s => s.team === team).map(s => s.score);
+                    if (teamScores.length === 0) return '-';
+                    const avg = teamScores.reduce((a, b) => a + b, 0) / teamScores.length;
+                    return avg.toFixed(2);
+                  })()}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
-
-// Simplified styles
-const tableHeaderStyle = {
-  padding: '8px 15px',
-  textAlign: 'center',
-  background: 'white',
-  color: '#2c5282'
-};
-
-const tableCellStyle = {
-  padding: '8px 15px',
-  textAlign: 'center',
-  borderBottom: '1px solid #ddd',
-  color: '#2c5282'
-};
-
-// Add some CSS to your App1.css file
-const cssToAdd = `
-.table-container {
-  overflow-x: auto;
-  max-width: 100%;
-  background-color: #f5f5f5;
-  padding: 15px;
-  border-radius: 5px;
-  margin-top: 20px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-table {
-  width: 100%;
-  border-collapse: collapse;
-  white-space: nowrap;
-  background-color: white;
-}
-
-th, td {
-  border: 1px solid #ddd;
-}
-
-tr:nth-child(even) {
-  background-color: #f9f9f9;
-}
-
-tr:hover {
-  background-color: #f5f5f5;
-}
-
-.container {
-  padding: 20px;
-  max-width: 100%;
-  margin: 0 auto;
-}
-`;
 
 export default App;

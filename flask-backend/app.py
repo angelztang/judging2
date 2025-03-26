@@ -38,7 +38,7 @@ class Score(db.Model):
     judge = db.Column(db.String(80), nullable=False, index=True)
     team = db.Column(db.String(80), nullable=False, index=True)
     score = db.Column(db.Float, nullable=True)
-    timestamp = db.Column(db.DateTime, nullable=True)
+    timestamp = db.Column(db.DateTime, default=db.func.current_timestamp())
     
     # Add unique constraint to prevent duplicate scores
     __table_args__ = (
