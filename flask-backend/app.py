@@ -175,11 +175,12 @@ def submit_score():
 def clear_scores():
     try:
         logger.info("Clearing all scores and judges...")
-        # Delete all scores
-        db.session.query(Score).delete()
-        db.session.commit()
-        logger.info("All scores and judges cleared successfully")
-        return jsonify({"message": "All scores and judges cleared successfully"}), 200
+        with app.app_context():
+            # Delete all scores
+            db.session.query(Score).delete()
+            db.session.commit()
+            logger.info("All scores and judges cleared successfully")
+            return jsonify({"message": "All scores and judges cleared successfully"}), 200
     except Exception as e:
         logger.error(f"Error clearing scores: {str(e)}")
         db.session.rollback()
