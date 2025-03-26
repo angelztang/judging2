@@ -37,7 +37,7 @@ class Score(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     judge = db.Column(db.String(80), nullable=False, index=True)
     team = db.Column(db.String(80), nullable=False, index=True)
-    score = db.Column(db.Float, nullable=False)
+    score = db.Column(db.Float, nullable=True)
     timestamp = db.Column(db.DateTime, nullable=True)
     
     # Add unique constraint to prevent duplicate scores
@@ -45,7 +45,7 @@ class Score(db.Model):
         db.UniqueConstraint('judge', 'team', name='unique_judge_team'),
     )
 
-    def __init__(self, judge, team, score):
+    def __init__(self, judge, team, score=None):
         self.judge = judge
         self.team = team
         self.score = score

@@ -1,16 +1,17 @@
 import React, { useState, useEffect } from "react";
 import "./App1.css";
 
-const teams = Array.from({ length: 20 }, (_, i) => `Team ${i + 1}`);
-const BACKEND_URL = 'https://judging-system-a20f58757cfa.herokuapp.com';
+const BACKEND_URL = 'http://localhost:5001';
 
 const getWeightedRandomTeams = (availableTeams, seenTeams, count) => {
-  let candidates = availableTeams.filter(team => !seenTeams.includes(team));
+  // Filter out Team 1 from available teams to prevent it from being assigned
+  const validTeams = availableTeams.filter(team => team !== "Team 1");
+  let candidates = validTeams.filter(team => !seenTeams.includes(team));
   
   // If we don't have enough unscored teams, allow rescoring some teams
   if (candidates.length < count) {
     const additionalNeeded = count - candidates.length;
-    const rescoreCandidates = availableTeams
+    const rescoreCandidates = validTeams
       .filter(team => seenTeams.includes(team))
       .sort(() => Math.random() - 0.5)
       .slice(0, additionalNeeded);
@@ -24,6 +25,8 @@ const getWeightedRandomTeams = (availableTeams, seenTeams, count) => {
 };
 
 function App() {
+  const [totalTeams, setTotalTeams] = useState(20);
+  const [teams, setTeams] = useState(Array.from({ length: 20 }, (_, i) => `Team ${i + 1}`));
   const [currentTeamsByJudge, setCurrentTeamsByJudge] = useState({});
   const [scoresByJudge, setScoresByJudge] = useState({});
   const [judges, setJudges] = useState([]);
@@ -31,6 +34,40 @@ function App() {
   const [seenTeamsByJudge, setSeenTeamsByJudge] = useState({});
   const [scoreTableData, setScoreTableData] = useState({});
   const [isLoading, setIsLoading] = useState(true);
+  const [showSettings, setShowSettings] = useState(false);
+  const [tempTeamInput, setTempTeamInput] = useState("20");  // New state for temporary input
+
+  const updateTotalTeams = (newTotal) => {
+    const numTeams = parseInt(newTotal);
+    if (!isNaN(numTeams) && numTeams > 0) {
+      setTotalTeams(numTeams);
+      setTeams(Array.from({ length: numTeams }, (_, i) => `Team ${i + 1}`));
+      // Reset all state to avoid issues with removed teams
+      setCurrentTeamsByJudge({});
+      setScoresByJudge({});
+      setSeenTeamsByJudge({});
+      setScoreTableData({});
+      setCurrentJudge("");
+    }
+  };
+
+  // Load judges on component mount
+  useEffect(() => {
+    const fetchJudges = async () => {
+      try {
+        const response = await fetch(`${BACKEND_URL}/api/judges`);
+        if (!response.ok) {
+          throw new Error('Failed to fetch judges');
+        }
+        const data = await response.json();
+        setJudges(data);
+      } catch (error) {
+        console.error("Error fetching judges:", error);
+      }
+    };
+
+    fetchJudges();
+  }, []);
 
   // Load initial data
   useEffect(() => {
@@ -38,8 +75,16 @@ function App() {
       try {
         setIsLoading(true);
         const [judgesRes, scoresRes] = await Promise.all([
-          fetch(`${BACKEND_URL}/api/judges`),
-          fetch(`${BACKEND_URL}/api/scores`)
+          fetch(`${BACKEND_URL}/api/judges`, {
+            headers: {
+              'Content-Type': 'application/json'
+            }
+          }),
+          fetch(`${BACKEND_URL}/api/scores`, {
+            headers: {
+              'Content-Type': 'application/json'
+            }
+          })
         ]);
 
         const judgesData = await judgesRes.json();
@@ -52,16 +97,14 @@ function App() {
         const newScoreTable = {};
         teams.forEach(team => {
           newScoreTable[team] = {};
-          // Initialize all scores as undefined (not empty string)
-          sortedJudges.forEach(judge => {
-            newScoreTable[team][judge] = undefined;
-          });
         });
 
-        // Fill in scores, including zeros
-        scoresData.forEach(({ team_id, judge_id, score }) => {
-          if (!newScoreTable[team_id]) newScoreTable[team_id] = {};
-          newScoreTable[team_id][judge_id] = score; // Store number directly
+        // Only fill in scores that were explicitly submitted
+        scoresData.forEach(({ team, judge, score }) => {
+          if (!newScoreTable[team]) newScoreTable[team] = {};
+          if (score !== null && score !== undefined) {
+            newScoreTable[team][judge] = score;
+          }
         });
 
         setJudges(sortedJudges);
@@ -85,23 +128,24 @@ function App() {
       setCurrentTeamsByJudge(prev => ({ ...prev, [currentJudge]: newTeams }));
       setScoresByJudge(prev => ({ ...prev, [currentJudge]: Array(5).fill("") }));
     }
-  }, [currentJudge]);
+  }, [currentJudge, currentTeamsByJudge, seenTeamsByJudge]);
 
   const handleJudgeChange = (event) => {
     const selectedJudge = event.target.value;
     if (!selectedJudge) {
       setCurrentJudge("");
-      setCurrentTeamsByJudge({});
-      setScoresByJudge({});
       return;
     }
 
-    const judgeSeenTeams = seenTeamsByJudge[selectedJudge] || [];
-    const newTeams = getWeightedRandomTeams(teams, judgeSeenTeams, 5);
+    // Only assign new teams if this judge doesn't have any teams assigned yet
+    if (!currentTeamsByJudge[selectedJudge]) {
+      const judgeSeenTeams = seenTeamsByJudge[selectedJudge] || [];
+      const newTeams = getWeightedRandomTeams(teams, judgeSeenTeams, 5);
+      setCurrentTeamsByJudge(prev => ({ ...prev, [selectedJudge]: newTeams }));
+      setScoresByJudge(prev => ({ ...prev, [selectedJudge]: Array(5).fill("") }));
+    }
     
     setCurrentJudge(selectedJudge);
-    setCurrentTeamsByJudge(prev => ({ ...prev, [selectedJudge]: newTeams }));
-    setScoresByJudge(prev => ({ ...prev, [selectedJudge]: Array(5).fill("") }));
   };
 
   const addNewJudge = async () => {
@@ -123,16 +167,17 @@ function App() {
       setCurrentTeamsByJudge(prev => ({ ...prev, [newJudge]: newTeams }));
       setScoresByJudge(prev => ({ ...prev, [newJudge]: Array(5).fill("") }));
 
-      // Register judge in backend
-      await fetch(`${BACKEND_URL}/api/scores`, {
+      // Register judge in backend without creating any scores
+      await fetch(`${BACKEND_URL}/api/judges`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          judge_id: newJudge,
-          team_id: "Team 1",
-          score: 0
+          judge: newJudge
         })
       });
+
+      // Set current judge to the new judge
+      setCurrentJudge(newJudge);
     } catch (error) {
       console.error("Error adding judge:", error);
       alert("Failed to add judge. Please try again.");
@@ -140,12 +185,16 @@ function App() {
   };
 
   const handleScoreChange = (index, value) => {
-    setScoresByJudge(prev => ({
-      ...prev,
-      [currentJudge]: prev[currentJudge].map((score, i) => 
-        i === index ? value : score
-      )
-    }));
+    // Convert to number and validate range
+    const numValue = parseFloat(value);
+    if (value === "" || (numValue >= 0 && numValue <= 3)) {
+      setScoresByJudge(prev => ({
+        ...prev,
+        [currentJudge]: prev[currentJudge].map((score, i) => 
+          i === index ? value : score
+        )
+      }));
+    }
   };
 
   const handleSubmit = async () => {
@@ -169,8 +218,8 @@ function App() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              judge_id: currentJudge,
-              team_id: team,
+              judge: currentJudge,
+              team: team,
               score: score
             })
           });
@@ -237,6 +286,62 @@ function App() {
         <div>Loading...</div>
       ) : (
         <>
+          <div className="settings-container" style={{ marginBottom: '20px' }}>
+            <button 
+              onClick={() => setShowSettings(!showSettings)}
+              style={{
+                backgroundColor: '#1b2d3f',
+                color: '#f1ead2',
+                border: 'none',
+                padding: '8px 16px',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                marginBottom: '10px'
+              }}
+            >
+              {showSettings ? 'Hide Settings' : 'Show Settings'}
+            </button>
+            
+            {showSettings && (
+              <div style={{
+                padding: '15px',
+                backgroundColor: '#1b2d3f',
+                borderRadius: '4px',
+                marginBottom: '20px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <label style={{ color: '#f1ead2' }}>Total Number of Teams: </label>
+                  <input
+                    type="text"
+                    pattern="[0-9]*"
+                    value={tempTeamInput}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (value === '' || /^\d+$/.test(value)) {
+                        setTempTeamInput(value);
+                        if (value !== '' && parseInt(value) > 0) {
+                          updateTotalTeams(parseInt(value));
+                        }
+                      }
+                    }}
+                    onBlur={() => {
+                      if (tempTeamInput === '' || parseInt(tempTeamInput) <= 0) {
+                        setTempTeamInput('1');
+                        updateTotalTeams(1);
+                      }
+                    }}
+                    style={{
+                      padding: '5px',
+                      width: '80px',
+                      borderRadius: '4px',
+                      border: '1px solid #ccc'
+                    }}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
           <div className="select-container">
             <label>Select Judge: </label>
             <select 
@@ -255,13 +360,16 @@ function App() {
           </div>
 
           <div className="team-inputs">
-            {(currentTeamsByJudge[currentJudge] || []).map((team, index) => (
+            {(currentTeamsByJudge[currentJudge] || [])
+              .filter(team => team !== "Team 0")  // Hide Team 0 from input interface
+              .map((team, index) => (
               <div key={team} className="team-input">
                 <span>{team}</span>
                 <input
                   type="number"
                   min="0"
                   max="3"
+                  step="0.1"
                   placeholder="Score (0-3)"
                   value={scoresByJudge[currentJudge]?.[index] || ""}
                   onChange={(e) => handleScoreChange(index, e.target.value)}
@@ -302,12 +410,13 @@ function App() {
                 </tr>
               </thead>
               <tbody>
-                {teams.map(team => {
+                {teams
+                  .map(team => {
                   const teamScores = scoreTableData[team] || {};
                   const average = calculateAverage(teamScores);
                   
                   return (
-                    <tr key={team}>
+                    <tr key={team} style={team === "Team 0" ? { backgroundColor: '#fff3f3' } : {}}>
                       <td style={tableCellStyle}>{team}</td>
                       {judges.map(judge => (
                         <td key={`${team}-${judge}`} style={tableCellStyle}>
@@ -318,9 +427,9 @@ function App() {
                         ...tableCellStyle,
                         position: 'sticky',
                         right: 0,
-                        background: 'white',
+                        background: team === "Team 0" ? '#fff3f3' : 'white',
                         fontWeight: 'bold',
-                        color: '#2c5282'
+                        color: team === "Team 0" ? '#ff4444' : '#2c5282'
                       }}>{average}</td>
                     </tr>
                   );
