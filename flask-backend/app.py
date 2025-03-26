@@ -176,8 +176,8 @@ def clear_scores():
     try:
         logger.info("Clearing all scores and judges...")
         with app.app_context():
-            # Use TRUNCATE to clear all data from the scores table
-            db.session.execute(text('TRUNCATE TABLE scores CASCADE;'))
+            # Use DELETE FROM to clear all data while preserving table structure
+            db.session.execute(text('DELETE FROM scores;'))
             db.session.commit()
             logger.info("All scores and judges cleared successfully")
             return jsonify({"message": "All scores and judges cleared successfully"}), 200
