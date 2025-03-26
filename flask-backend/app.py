@@ -134,25 +134,32 @@ def submit_score():
         logger.info(f"Received score data: {data}")
         
         if not data or not all(key in data for key in ['judge', 'team', 'score']):
+            logger.error("Missing required data in request")
             return jsonify({"error": "Missing required data"}), 400
         
         judge_id = data['judge']
         team_id = data['team']
         score = float(data['score'])
         
+        logger.info(f"Processing score submission - Judge: {judge_id}, Team: {team_id}, Score: {score}")
+        
         # Validate score range
         if not (0 <= score <= 3):
+            logger.error(f"Invalid score value: {score}")
             return jsonify({"error": "Score must be between 0 and 3"}), 400
         
         # Use upsert to handle both insert and update efficiently
         score_obj = Score.query.filter_by(judge=judge_id, team=team_id).first()
         if score_obj:
+            logger.info(f"Updating existing score for Judge: {judge_id}, Team: {team_id}")
             score_obj.score = score
         else:
+            logger.info(f"Creating new score for Judge: {judge_id}, Team: {team_id}")
             score_obj = Score(judge=judge_id, team=team_id, score=score)
             db.session.add(score_obj)
         
         db.session.commit()
+        logger.info(f"Successfully saved score for Judge: {judge_id}, Team: {team_id}")
         
         return jsonify({
             "message": "Score submitted successfully!",
@@ -163,8 +170,8 @@ def submit_score():
             }
         }), 201
     
-    except ValueError:
-        logger.error("Invalid score value provided")
+    except ValueError as e:
+        logger.error(f"Invalid score value provided: {str(e)}")
         return jsonify({"error": "Invalid score value"}), 400
     except Exception as e:
         logger.error(f"Error submitting score: {str(e)}")
