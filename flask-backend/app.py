@@ -93,12 +93,11 @@ def get_scores():
 def get_judges():
     try:
         logger.info("Fetching judges...")
-        with app.app_context():
-            # Get unique judges from the scores table
-            judges = db.session.query(Score.judge).distinct().all()
-            judges_list = [judge[0] for judge in judges]
-            logger.info(f"Found {len(judges_list)} judges")
-            return jsonify(judges_list)
+        # Get unique judges from the scores table
+        judges = db.session.query(Score.judge).distinct().all()
+        judges_list = [judge[0] for judge in judges]
+        logger.info(f"Found {len(judges_list)} judges")
+        return jsonify(judges_list)
     except Exception as e:
         logger.error(f"Error fetching judges: {str(e)}")
         logger.error(f"Error type: {type(e).__name__}")
