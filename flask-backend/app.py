@@ -5,6 +5,7 @@ import os
 from dotenv import load_dotenv
 import psycopg2
 import logging
+from sqlalchemy import text
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
@@ -22,35 +23,16 @@ if not DATABASE_URL:
 logger.info(f"Connecting to database...")
 
 app = Flask(__name__, static_folder='static', static_url_path='')
-CORS(app)  # Allow all origins
+CORS(app, supports_credentials=True)
 
 # Configure the database
 app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL.replace('postgres://', 'postgresql://')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-try:
-    db = SQLAlchemy(app)
-    # Test the connection
-    with app.app_context():
-        # Enable SSL mode for Heroku
-        if 'amazonaws.com' in DATABASE_URL:
-            db.engine.execute("SET SESSION ssl_mode='require';")
-        db.engine.connect()
-        # Create tables if they don't exist
-        db.create_all()
-    logger.info("Database connection successful!")
-except Exception as e:
-    logger.error(f"Error connecting to database: {str(e)}")
-    raise
+# Initialize database
+db = SQLAlchemy(app)
 
-def get_db_connection():
-    if 'amazonaws.com' in DATABASE_URL:
-        conn = psycopg2.connect(DATABASE_URL, sslmode='require')
-    else:
-        conn = psycopg2.connect(DATABASE_URL)
-    return conn
-
-# Score model
+# Database Models
 class Score(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     judge = db.Column(db.String(80), nullable=False, index=True)
@@ -63,16 +45,35 @@ class Score(db.Model):
         db.UniqueConstraint('judge', 'team', name='unique_judge_team'),
     )
 
-# Serve the frontend
-@app.route('/', defaults={'path': ''})
-@app.route('/<path:path>')
-def serve(path):
-    if path and os.path.exists(os.path.join(app.static_folder, path)):
-        return send_from_directory(app.static_folder, path)
-    else:
-        return send_from_directory(app.static_folder, 'index.html')
+    def __init__(self, judge, team, score):
+        self.judge = judge
+        self.team = team
+        self.score = score
+        self.timestamp = None
 
-# Endpoint to fetch all scores from the database
+# Test the connection
+try:
+    with app.app_context():
+        db.engine.connect()
+        # Create tables if they don't exist
+        db.create_all()
+        # Verify no automatic score creation
+        initial_scores = Score.query.all()
+        if initial_scores:
+            logger.info(f"Found {len(initial_scores)} initial scores")
+    logger.info("Database connection successful!")
+except Exception as e:
+    logger.error(f"Error connecting to database: {str(e)}")
+    raise
+
+def get_db_connection():
+    if 'amazonaws.com' in DATABASE_URL:
+        conn = psycopg2.connect(DATABASE_URL, sslmode='require')
+    else:
+        conn = psycopg2.connect(DATABASE_URL)
+    return conn
+
+# API Routes
 @app.route('/api/scores', methods=['GET'])
 def get_scores():
     try:
@@ -88,12 +89,12 @@ def get_scores():
         logger.error(f"Error details: {str(e.__dict__)}")
         return jsonify({"error": str(e)}), 500
 
-# Endpoint to get all unique judges
 @app.route('/api/judges', methods=['GET'])
 def get_judges():
     try:
         logger.info("Fetching judges...")
         with app.app_context():
+            # Get unique judges from the scores table
             judges = db.session.query(Score.judge).distinct().all()
             judges_list = [judge[0] for judge in judges]
             logger.info(f"Found {len(judges_list)} judges")
@@ -104,7 +105,6 @@ def get_judges():
         logger.error(f"Error details: {str(e.__dict__)}")
         return jsonify({"error": str(e)}), 500
 
-# Endpoint to add a new judge
 @app.route('/api/judges', methods=['POST'])
 def add_judge():
     try:
@@ -120,15 +120,7 @@ def add_judge():
         if existing_judge:
             return jsonify({"error": "Judge already exists"}), 400
             
-        # Create an initial score entry to persist the judge
-        initial_score = Score(
-            judge=judge_id,
-            team="Team 1",  # Using a placeholder team
-            score=0
-        )
-        db.session.add(initial_score)
-        db.session.commit()
-        
+        # Just return success - no need to create any database entries
         return jsonify({"message": "Judge added successfully"}), 201
         
     except Exception as e:
@@ -136,7 +128,6 @@ def add_judge():
         db.session.rollback()
         return jsonify({"error": str(e)}), 500
 
-# Endpoint to submit a score to the database
 @app.route('/api/scores', methods=['POST'])
 def submit_score():
     try:
@@ -150,6 +141,7 @@ def submit_score():
         team_id = data['team']
         score = float(data['score'])
         
+        # Validate score range
         if not (0 <= score <= 3):
             return jsonify({"error": "Score must be between 0 and 3"}), 400
         
@@ -163,7 +155,6 @@ def submit_score():
         
         db.session.commit()
         
-        # Return the complete updated data
         return jsonify({
             "message": "Score submitted successfully!",
             "score": {
@@ -173,11 +164,37 @@ def submit_score():
             }
         }), 201
     
+    except ValueError:
+        logger.error("Invalid score value provided")
+        return jsonify({"error": "Invalid score value"}), 400
     except Exception as e:
         logger.error(f"Error submitting score: {str(e)}")
         db.session.rollback()
         return jsonify({"error": str(e)}), 500
 
+@app.route('/api/scores', methods=['DELETE'])
+def clear_scores():
+    try:
+        logger.info("Clearing all scores and judges...")
+        # Delete all scores
+        db.session.query(Score).delete()
+        db.session.commit()
+        logger.info("All scores and judges cleared successfully")
+        return jsonify({"message": "All scores and judges cleared successfully"}), 200
+    except Exception as e:
+        logger.error(f"Error clearing scores: {str(e)}")
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+
+# Static file serving (should be last)
+@app.route('/', defaults={'path': ''})
+@app.route('/<path:path>')
+def serve(path):
+    if path and os.path.exists(os.path.join(app.static_folder, path)):
+        return send_from_directory(app.static_folder, path)
+    else:
+        return send_from_directory(app.static_folder, 'index.html')
+
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
+    port = int(os.environ.get('PORT', 5001))
     app.run(host='0.0.0.0', port=port)
