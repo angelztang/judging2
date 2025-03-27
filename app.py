@@ -18,36 +18,34 @@ CORS(app, resources={
     }
 })
 
-# Configure the database
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ['DATABASE_URL'].replace('postgres', 'postgresql+psycopg2')
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-db = SQLAlchemy(app)
-
-DATABASE_URL = os.environ['DATABASE_URL']
-
-def get_db_connection():
-    conn = psycopg2.connect(DATABASE_URL, sslmode='require')
-    return conn
-
-# Score model
-class Score(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    judge_id = db.Column(db.String(80), nullable=False)
-    team_id = db.Column(db.String(80), nullable=False)
-    score = db.Column(db.Float, nullable=False)
+# Configure the database if DATABASE_URL is available
+db = None
+if 'DATABASE_URL' in os.environ:
+    app.config['SQLALCHEMY_DATABASE_URI'] = os.environ['DATABASE_URL'].replace('postgres', 'postgresql+psycopg2')
+    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+    db = SQLAlchemy(app)
     
-    # Add unique constraint to prevent duplicate scores
-    __table_args__ = (
-        db.UniqueConstraint('judge_id', 'team_id', name='unique_judge_team'),
-    )
+    # Score model
+    class Score(db.Model):
+        id = db.Column(db.Integer, primary_key=True)
+        judge_id = db.Column(db.String(80), nullable=False)
+        team_id = db.Column(db.String(80), nullable=False)
+        score = db.Column(db.Float, nullable=False)
+        
+        # Add unique constraint to prevent duplicate scores
+        __table_args__ = (
+            db.UniqueConstraint('judge_id', 'team_id', name='unique_judge_team'),
+        )
 
-# Initialize database tables
-with app.app_context():
-    try:
-        db.create_all()
-        print("Database tables created successfully!")
-    except Exception as e:
-        print(f"Error creating database tables: {e}")
+    # Initialize database tables
+    with app.app_context():
+        try:
+            db.create_all()
+            print("Database tables created successfully!")
+        except Exception as e:
+            print(f"Error creating database tables: {e}")
+else:
+    print("No database URL configured. Database functionality will be disabled.")
 
 # Serve static files from the React app
 @app.route('/', defaults={'path': ''})
