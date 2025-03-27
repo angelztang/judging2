@@ -165,23 +165,30 @@ function App() {
         
         const scoresData = await scoresRes.json();
 
-        // Initialize score table
+        // Initialize score table and seen teams
         const newScoreTable = {};
+        const newSeenTeams = {};
+        
         teams.forEach(team => {
           newScoreTable[team] = {};
         });
 
-        // Only fill in scores that were explicitly submitted
+        // Fill in scores and track seen teams
         scoresData.forEach(({ team, judge, score }) => {
           if (!newScoreTable[team]) newScoreTable[team] = {};
           if (score !== null && score !== undefined) {
             newScoreTable[team][judge] = score;
+            // Track this team as seen by this judge
+            if (!newSeenTeams[judge]) newSeenTeams[judge] = [];
+            if (!newSeenTeams[judge].includes(team)) {
+              newSeenTeams[judge].push(team);
+            }
           }
         });
 
         setJudges(sortedJudges);
         setScoreTableData(newScoreTable);
-        setSeenTeamsByJudge({});
+        setSeenTeamsByJudge(newSeenTeams);
         setIsLoading(false);
       } catch (error) {
         // Silently handle any errors
@@ -191,7 +198,7 @@ function App() {
     };
 
     loadData();
-  }, []);
+  }, [teams]);
 
   // Assign teams when judge is selected
   useEffect(() => {
@@ -213,9 +220,17 @@ function App() {
     // Only assign new teams if this judge doesn't have any teams assigned yet
     if (!currentTeamsByJudge[selectedJudge]) {
       const judgeSeenTeams = seenTeamsByJudge[selectedJudge] || [];
-      const newTeams = getWeightedRandomTeams(teams, judgeSeenTeams, 5, seenTeamsByJudge);
-      setCurrentTeamsByJudge(prev => ({ ...prev, [selectedJudge]: newTeams }));
-      setScoresByJudge(prev => ({ ...prev, [selectedJudge]: Array(5).fill("") }));
+      const unseenTeams = teams.filter(team => !judgeSeenTeams.includes(team));
+      
+      // If no unseen teams, don't assign any
+      if (unseenTeams.length === 0) {
+        setCurrentTeamsByJudge(prev => ({ ...prev, [selectedJudge]: [] }));
+        setScoresByJudge(prev => ({ ...prev, [selectedJudge]: [] }));
+      } else {
+        const newTeams = getWeightedRandomTeams(teams, judgeSeenTeams, 5, seenTeamsByJudge);
+        setCurrentTeamsByJudge(prev => ({ ...prev, [selectedJudge]: newTeams }));
+        setScoresByJudge(prev => ({ ...prev, [selectedJudge]: Array(newTeams.length).fill("") }));
+      }
     }
     
     setCurrentJudge(selectedJudge);
@@ -234,10 +249,19 @@ function App() {
       // Add judge to state (maintaining sort)
       setJudges(prev => [...prev, newJudge].sort((a, b) => a.localeCompare(b)));
       
-      // Assign teams immediately
-      const newTeams = getWeightedRandomTeams(teams, [], 5, seenTeamsByJudge);
-      setCurrentTeamsByJudge(prev => ({ ...prev, [newJudge]: newTeams }));
-      setScoresByJudge(prev => ({ ...prev, [newJudge]: Array(5).fill("") }));
+      // Check if there are any unseen teams
+      const judgeSeenTeams = seenTeamsByJudge[newJudge] || [];
+      const unseenTeams = teams.filter(team => !judgeSeenTeams.includes(team));
+      
+      // Only assign teams if there are unseen ones
+      if (unseenTeams.length > 0) {
+        const newTeams = getWeightedRandomTeams(teams, judgeSeenTeams, 5, seenTeamsByJudge);
+        setCurrentTeamsByJudge(prev => ({ ...prev, [newJudge]: newTeams }));
+        setScoresByJudge(prev => ({ ...prev, [newJudge]: Array(newTeams.length).fill("") }));
+      } else {
+        setCurrentTeamsByJudge(prev => ({ ...prev, [newJudge]: [] }));
+        setScoresByJudge(prev => ({ ...prev, [newJudge]: [] }));
+      }
 
       // Register judge in backend without creating any scores
       await fetch(`${BACKEND_URL}/api/judges`, {
