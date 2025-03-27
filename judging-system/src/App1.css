@@ -1,0 +1,176 @@
+/* General styles */
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: #f1ead2;
+    color: #f1ead2;
+  }
+  
+  .container {
+    width: 80%;
+    margin: 0 auto;
+    padding: 20px;
+    background-color: #1b2d3f;
+    border-radius: 8px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    max-width: 100%;
+  }
+  
+  h1 {
+    text-align: center;
+    color: #f1ead2;
+  }
+  
+  h2 {
+    margin-top: 30px;
+    color: #f1ead2;
+  }
+  
+  .select-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+  }
+  
+  select {
+    padding: 10px;
+    font-size: 16px;
+    border-radius: 5px;
+    border: 1px solid #ccc;
+  }
+  
+  .add-judge-btn {
+    background-color: #bf3131;
+    color: #1b2d3f;
+    padding: 10px 15px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+  }
+  
+  .add-judge-btn:hover {
+    background-color: #f1ead2;
+  }
+  
+  /* Align score inputs to the left */
+  .team-inputs {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 20px;
+  }
+  
+  .team-input {
+    display: flex;
+    justify-content: flex-start;
+    margin-bottom: 10px;
+  }
+  
+  .team-input span {
+    margin-right: 10px;
+    width: 120px; /* Make sure the labels (team names) are aligned */
+  }
+  
+  input {
+    padding: 10px;
+    font-size: 16px;
+    width: 150px; /* Set a fixed width for input fields */
+    border-radius: 5px;
+    border: 1px solid #ccc;
+  }
+  
+  .submit-btn {
+    width: 100%;
+    background-color: #bf3131;
+    color: white;
+    padding: 12px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+  }
+  
+  .submit-btn:hover {
+    background-color: #f1ead2;
+  }
+  
+  /* Score Table - make it horizontally scrollable */
+  .table-container {
+    overflow-x: auto;
+    max-width: 100%;
+    margin-top: 20px;
+  }
+  
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    white-space: nowrap;
+    background-color: white;
+    color: #1b2d3f;  /* Dark blue color for table text */
+  }
+  
+  th {
+    background-color: #d48277 !important;  /* Your original reddish color */
+    color: #f1ead2 !important;  /* Light color for header text */
+    padding: 8px 15px;
+    text-align: center;
+  }
+  
+  td {
+    padding: 8px 15px;
+    text-align: center;
+    border: 1px solid #ddd;
+  }
+  
+  /* Update the sticky average column styles */
+  th:last-child {
+    position: sticky;
+    right: 0;
+    background-color: #d48277 !important;
+    color: #f1ead2 !important;
+    z-index: 1;
+  }
+  
+  td:last-child {
+    position: sticky;
+    right: 0;
+    background-color: #f9f9f9 !important;
+    font-weight: bold;
+    z-index: 1;
+  }
+  
+  .range-inputs {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0 10px;
+  }
+  
+  .range-inputs input {
+    padding: 5px;
+    width: 80px;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+    background-color: #fff;
+  }
+  
+  .range-inputs span {
+    color: #f1ead2;
+  }
+  
+  .range-inputs button {
+    padding: 5px 10px;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+    background-color: #1b2d3f;
+    color: #f1ead2;
+    cursor: pointer;
+    margin-left: 10px;
+  }
+  
+  .range-inputs button:hover {
+    background-color: #2a3f55;
+  }
+  
