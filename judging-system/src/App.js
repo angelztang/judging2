@@ -32,65 +32,30 @@ const getWeightedRandomTeams = (availableTeams, seenTeams, count, seenTeamsByJud
   // Get the current judge's seen teams
   const judgeSeenTeams = seenTeams || [];
   
-  // Get all available teams that haven't been seen by this judge
-  let unseenByJudge = availableTeams.filter(team => !judgeSeenTeams.includes(team));
+  // Get all teams this judge hasn't seen yet
+  let unseenTeams = availableTeams.filter(team => !judgeSeenTeams.includes(team));
   
-  // Count how many times each team has been judged across all judges
+  // If no unseen teams, return empty array
+  if (unseenTeams.length === 0) {
+    return [];
+  }
+  
+  // Count how many times each unseen team has been judged
   const teamJudgmentCounts = {};
-  unseenByJudge.forEach(team => {
+  unseenTeams.forEach(team => {
     teamJudgmentCounts[team] = 0;
-  });
-  
-  // Count judgments from all judges
-  Object.values(seenTeamsByJudge).forEach(judgeTeams => {
-    judgeTeams.forEach(team => {
-      if (teamJudgmentCounts[team] !== undefined) {
+    Object.values(seenTeamsByJudge).forEach(judgeTeams => {
+      if (judgeTeams.includes(team)) {
         teamJudgmentCounts[team]++;
       }
     });
   });
   
-  // Sort unseen teams by their overall judgment count
-  unseenByJudge.sort((a, b) => teamJudgmentCounts[a] - teamJudgmentCounts[b]);
+  // Sort by number of times judged
+  unseenTeams.sort((a, b) => teamJudgmentCounts[a] - teamJudgmentCounts[b]);
   
-  // If we have fewer teams than requested, return all available unseen teams
-  if (unseenByJudge.length <= count) {
-    return unseenByJudge;
-  }
-  
-  // Try to find teams within range 7
-  for (let i = 0; i < unseenByJudge.length; i++) {
-    const firstTeam = unseenByJudge[i];
-    const firstTeamNum = parseInt(firstTeam.split(' ')[1]);
-    
-    // Get all teams within 7 numbers of the first team
-    const potentialTeams = unseenByJudge.filter(team => {
-      const teamNum = parseInt(team.split(' ')[1]);
-      return Math.abs(teamNum - firstTeamNum) <= 7;
-    });
-    
-    // If we have enough teams, try to find a subset that meets our range requirement
-    if (potentialTeams.length >= count) {
-      // Sort potential teams by judgment count
-      potentialTeams.sort((a, b) => teamJudgmentCounts[a] - teamJudgmentCounts[b]);
-      
-      // Take the first 'count' teams that are within range
-      const selectedTeams = [];
-      for (let j = 0; j < potentialTeams.length && selectedTeams.length < count; j++) {
-        const teamNum = parseInt(potentialTeams[j].split(' ')[1]);
-        if (Math.abs(teamNum - firstTeamNum) <= 7) {
-          selectedTeams.push(potentialTeams[j]);
-        }
-      }
-      
-      if (selectedTeams.length === count) {
-        return selectedTeams;
-      }
-    }
-  }
-  
-  // If we couldn't find a perfect set within range 7, return the top N unseen teams by judgment count
-  return unseenByJudge.slice(0, count);
+  // Return up to 'count' teams
+  return unseenTeams.slice(0, count);
 };
 
 // Add error handling for score submission
