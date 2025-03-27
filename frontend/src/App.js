@@ -578,7 +578,6 @@ function App() {
         alert('All judges have been reset successfully!');
       } catch (error) {
         console.error('Error resetting judges:', error);
-        alert('An error occurred while resetting judges. Please try again.');
       }
     }
   };
