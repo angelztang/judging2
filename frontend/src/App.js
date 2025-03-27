@@ -473,7 +473,7 @@ function App() {
 
   return (
     <div className="container">
-      <h1>Hackathon Judging System</h1>
+      <h1>Hackathon Judging System 2</h1>
 
       {isLoading ? (
         <div>Loading...</div>
