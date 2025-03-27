@@ -175,10 +175,12 @@ const submitScore = async (judge, team, score) => {
 
     return data;
   } catch (error) {
-    // Only log and throw if it's a real error
-    if (error.message) {
-      console.error('Error submitting score:', error);
+    // Don't throw network errors, just return null
+    if (error.message === 'Failed to fetch') {
+      console.error('Network error:', error);
+      return null;
     }
+    // Only throw other errors
     throw error;
   }
 };
@@ -387,7 +389,13 @@ function App() {
       });
 
       // Wait for all submissions to complete
-      await Promise.all(submissionPromises);
+      const results = await Promise.all(submissionPromises);
+
+      // Check if any submissions failed
+      if (results.some(result => result === null)) {
+        alert("Some scores may not have been saved due to network issues. Please check your connection and try again.");
+        return;
+      }
 
       // Update the score table with all scores
       const newScoreTable = { ...scoreTableData };
@@ -418,11 +426,11 @@ function App() {
       // Reset current judge
       setCurrentJudge("");
 
-      // Show success message without any error indication
+      // Show success message
       alert("Scores submitted successfully!");
     } catch (error) {
-      // Only show error message if there's an actual error
-      if (error.message) {
+      // Only show error message if it's not a network error
+      if (error.message && error.message !== 'Failed to fetch') {
         console.error("Error submitting scores:", error);
         alert(`Error submitting scores: ${error.message}`);
       }
