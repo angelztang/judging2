@@ -1,3 +1,10 @@
+-- Create judges table if it doesn't exist
+CREATE TABLE IF NOT EXISTS judges (
+    id SERIAL PRIMARY KEY,
+    judge_name VARCHAR(80) NOT NULL UNIQUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Create scores table if it doesn't exist
 CREATE TABLE IF NOT EXISTS scores (
     id SERIAL PRIMARY KEY,

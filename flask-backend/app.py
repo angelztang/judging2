@@ -49,15 +49,20 @@ app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
 db = SQLAlchemy(app)
 
 # Database Models
+class Judge(db.Model):
+    __tablename__ = 'judges'
+    id = db.Column(db.Integer, primary_key=True)
+    judge_name = db.Column(db.String(80), nullable=False, unique=True)
+    created_at = db.Column(db.DateTime, default=db.func.current_timestamp())
+
 class Score(db.Model):
-    __tablename__ = 'scores'  # Explicitly set the table name
+    __tablename__ = 'scores'
     id = db.Column(db.Integer, primary_key=True)
     judge = db.Column(db.String(80), nullable=False, index=True)
     team = db.Column(db.String(80), nullable=False, index=True)
     score = db.Column(db.Float, nullable=True)
     timestamp = db.Column(db.DateTime, default=db.func.current_timestamp())
     
-    # Add unique constraint to prevent duplicate scores
     __table_args__ = (
         db.UniqueConstraint('judge', 'team', name='unique_judge_team'),
     )
@@ -121,9 +126,9 @@ def get_scores():
 def get_judges():
     try:
         logger.info("Fetching judges...")
-        # Get unique judges from the scores table
-        judges = db.session.query(Score.judge).distinct().all()
-        judges_list = [judge[0] for judge in judges]
+        # Get all judges from the judges table
+        judges = Judge.query.all()
+        judges_list = [judge.judge_name for judge in judges]
         logger.info(f"Found {len(judges_list)} judges")
         return jsonify(judges_list)
     except Exception as e:
@@ -140,14 +145,19 @@ def add_judge():
         if not data or 'judge' not in data:
             return jsonify({"error": "Missing judge"}), 400
             
-        judge_id = data['judge']
+        judge_name = data['judge']
         
         # Check if judge already exists
-        existing_judge = db.session.query(Score.judge).filter_by(judge=judge_id).first()
+        existing_judge = Judge.query.filter_by(judge_name=judge_name).first()
         if existing_judge:
             return jsonify({"error": "Judge already exists"}), 400
             
-        # Just return success - no need to create any database entries
+        # Create new judge
+        new_judge = Judge(judge_name=judge_name)
+        db.session.add(new_judge)
+        db.session.commit()
+        
+        logger.info(f"Successfully added new judge: {judge_name}")
         return jsonify({"message": "Judge added successfully"}), 201
         
     except Exception as e:
@@ -209,13 +219,13 @@ def submit_score():
 @app.route('/api/scores', methods=['DELETE'])
 def clear_scores():
     try:
-        logger.info("Clearing all scores and judges...")
+        logger.info("Clearing all scores...")
         with app.app_context():
             # Use DELETE FROM to clear all data while preserving table structure
             db.session.execute(text('DELETE FROM scores;'))
             db.session.commit()
-            logger.info("All scores and judges cleared successfully")
-            return jsonify({"message": "All scores and judges cleared successfully"}), 200
+            logger.info("All scores cleared successfully")
+            return jsonify({"message": "All scores cleared successfully"}), 200
     except Exception as e:
         logger.error(f"Error clearing scores: {str(e)}")
         db.session.rollback()
