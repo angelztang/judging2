@@ -12,7 +12,7 @@ logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 # Load environment variables from the .env file
-load_dotenv(override=True)
+load_dotenv()
 
 # Get the database URL from environment
 DATABASE_URL = os.getenv('DATABASE_URL')
