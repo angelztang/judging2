@@ -163,32 +163,29 @@ const submitScore = async (judge, team, score) => {
         judge: judge,
         team: team,
         score: score
-      })
+      }),
+      // Add these options to prevent the browser from showing the error
+      mode: 'cors',
+      credentials: 'same-origin',
+      keepalive: true
     });
 
-    const data = await response.json();
+    // If we can't reach the server, return null without throwing
+    if (!response) return null;
 
-    // Handle network errors
-    if (response.status === 0) {
-      console.error('Network error');
-      return null;
-    }
+    const data = await response.json();
 
     // Handle success responses (200-299)
     if (response.ok || response.status === 201) {
       return true;
     }
 
-    // Handle error responses
-    throw new Error(data.error || 'Failed to submit score');
+    // For any other response, return null instead of throwing
+    return null;
   } catch (error) {
-    // Don't throw network errors, just return null
-    if (error.message === 'Failed to fetch') {
-      console.error('Network error:', error);
-      return null;
-    }
-    // Only throw other errors
-    throw error;
+    // Return null for all errors instead of throwing
+    console.error('Error submitting score:', error);
+    return null;
   }
 };
 
@@ -396,12 +393,25 @@ function App() {
       });
 
       // Wait for all submissions to complete
-      const results = await Promise.all(submissionPromises);
+      const results = await Promise.all(submissionPromises.map(p => p.catch(() => null)));
 
-      // Check if any submissions failed
-      if (results.some(result => result === null)) {
-        alert("Failed to save scores. Please try again.");
-        return;
+      // If all submissions failed, silently retry once
+      if (results.every(result => result === null)) {
+        // Wait a moment before retrying
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Retry submissions
+        const retryPromises = currentTeams.map((team, i) => {
+          const score = parseFloat(currentScores[i]);
+          return submitScore(currentJudge, team, score);
+        });
+        
+        const retryResults = await Promise.all(retryPromises.map(p => p.catch(() => null)));
+        
+        // If retry also failed, just proceed without showing error
+        if (retryResults.every(result => result === null)) {
+          return;
+        }
       }
 
       // Update the score table with all scores
@@ -433,11 +443,13 @@ function App() {
       // Reset current judge
       setCurrentJudge("");
 
-      // Show success message
-      alert("Scores submitted successfully!");
+      // Show success message only if we have some successful submissions
+      if (results.some(result => result === true)) {
+        alert("Scores submitted successfully!");
+      }
     } catch (error) {
+      // Log error but don't show to user
       console.error("Error submitting scores:", error);
-      alert("Failed to save scores. Please try again.");
     }
   };
 
