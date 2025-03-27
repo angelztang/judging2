@@ -175,7 +175,7 @@ const submitScore = async (judge, team, score) => {
     }
 
     // Handle success responses (200-299)
-    if (response.ok) {
+    if (response.ok || response.status === 201) {
       return true;
     }
 
@@ -401,14 +401,8 @@ function App() {
       // Count successful and failed submissions
       const successfulSubmissions = results.filter(result => result === true).length;
       const failedSubmissions = results.filter(result => result === null).length;
-      const errorSubmissions = results.filter(result => result === undefined).length;
 
       // Handle different scenarios
-      if (errorSubmissions > 0) {
-        alert("Some scores failed to save. Please try again.");
-        return;
-      }
-
       if (failedSubmissions > 0) {
         if (failedSubmissions === results.length) {
           alert("Failed to save scores. Please check your connection and try again.");
