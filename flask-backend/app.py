@@ -50,6 +50,7 @@ db = SQLAlchemy(app)
 
 # Database Models
 class Score(db.Model):
+    __tablename__ = 'scores'  # Explicitly set the table name
     id = db.Column(db.Integer, primary_key=True)
     judge = db.Column(db.String(80), nullable=False, index=True)
     team = db.Column(db.String(80), nullable=False, index=True)
