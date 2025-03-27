@@ -55,8 +55,6 @@ class Score(db.Model):
 try:
     with app.app_context():
         db.engine.connect()
-        # Drop all tables first
-        db.drop_all()
         # Create tables if they don't exist
         db.create_all()
         # Verify no automatic score creation
