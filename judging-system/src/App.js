@@ -61,23 +61,13 @@ const getWeightedRandomTeams = (availableTeams, seenTeams, count, seenTeamsByJud
 // Add error handling for score submission
 const submitScore = async (judge, team, score) => {
   try {
-    const response = await fetch(`${BACKEND_URL}/api/scores`, {
+    await fetch(`${BACKEND_URL}/api/scores`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      },
-      body: JSON.stringify({
-        judge: judge,
-        team: team,
-        score: score
-      })
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ judge, team, score })
     });
-    
-    // Always return true regardless of response
     return true;
   } catch (error) {
-    // Silently handle any errors
     console.log("Error handled silently:", error);
     return true;
   }
@@ -91,8 +81,7 @@ function App() {
   });
   
   const [teams, setTeams] = useState(() => {
-    const savedRange = localStorage.getItem('teamRange');
-    const range = savedRange ? JSON.parse(savedRange) : { start: 51, end: 99 };
+    const range = teamRange;
     return Array.from({ length: range.end - range.start + 1 }, (_, i) => `Team ${i + range.start}`);
   });
   
@@ -147,22 +136,11 @@ function App() {
       try {
         setIsLoading(true);
         const [judgesRes, scoresRes] = await Promise.all([
-          fetch(`${BACKEND_URL}/api/judges`, {
-            headers: {
-              'Content-Type': 'application/json'
-            }
-          }),
-          fetch(`${BACKEND_URL}/api/scores`, {
-            headers: {
-              'Content-Type': 'application/json'
-            }
-          })
+          fetch(`${BACKEND_URL}/api/judges`),
+          fetch(`${BACKEND_URL}/api/scores`)
         ]);
 
-        const judgesData = await judgesRes.json();
-        // Sort judges alphabetically
-        const sortedJudges = judgesData.sort((a, b) => a.localeCompare(b));
-        
+        const sortedJudges = (await judgesRes.json()).sort((a, b) => a.localeCompare(b));
         const scoresData = await scoresRes.json();
 
         // Initialize score table and seen teams
@@ -238,12 +216,7 @@ function App() {
 
   const addNewJudge = async () => {
     const newJudge = prompt("Enter your name:");
-    if (!newJudge) return;
-    
-    // Check case-insensitive duplicates
-    if (judges.some(j => j.toLowerCase() === newJudge.toLowerCase())) {
-      return;
-    }
+    if (!newJudge || judges.some(j => j.toLowerCase() === newJudge.toLowerCase())) return;
 
     try {
       // Add judge to state (maintaining sort)
@@ -306,8 +279,7 @@ function App() {
       
       // Submit scores sequentially
       for (let i = 0; i < teamsWithScores.length; i++) {
-        const score = parseFloat(validScores[i]);
-        await submitScore(currentJudge, teamsWithScores[i], score);
+        await submitScore(currentJudge, teamsWithScores[i], parseFloat(validScores[i]));
         
         // Add a small delay between requests
         if (i < teamsWithScores.length - 1) {
