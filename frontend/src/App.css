@@ -1,38 +1,120 @@
-.App {
+General styles
+body {
+  font-family: Arial, sans-serif;
+  margin: 0;
+  padding: 0;
+  background-color: #f1ead2;
+  color: #f1ead2;
+}
+
+.container {
+  width: 80%;
+  margin: 0 auto;
+  padding: 30px;
+  background-color: #1b2d3f;
+  border-radius: 8px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+}
+
+h1 {
   text-align: center;
+  color: #f1ead2;
 }
 
-.App-logo {
-  height: 40vmin;
-  pointer-events: none;
+h2 {
+  margin-top: 30px;
+  color: #f1ead2;;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  .App-logo {
-    animation: App-logo-spin infinite 20s linear;
-  }
+.select-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
 }
 
-.App-header {
-  background-color: #282c34;
-  min-height: 100vh;
+select {
+  padding: 10px;
+  font-size: 16px;
+  border-radius: 5px;
+  border: 1px solid #ccc;
+}
+
+.add-judge-btn {
+  background-color: #f1ead2;
+  color: #1b2d3f;
+  padding: 10px 15px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.add-judge-btn:hover {
+  background-color: #bf3131;
+}
+
+/* Align score inputs to the left */
+.team-inputs {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  font-size: calc(10px + 2vmin);
+  margin-bottom: 20px;
+}
+
+.team-input {
+  display: flex;
+  justify-content: flex-start;
+  margin-bottom: 10px;
+}
+
+.team-input span {
+  margin-right: 10px;
+  width: 120px; /* Make sure the labels (team names) are aligned */
+}
+
+input {
+  padding: 10px;
+  font-size: 16px;
+  width: 150px; /* Set a fixed width for input fields */
+  border-radius: 5px;
+  border: 1px solid #ccc;
+}
+
+.submit-btn {
+  width: 100%;
+  background-color: #bf3131;
   color: white;
+  padding: 12px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
 }
 
-.App-link {
-  color: #61dafb;
+.submit-btn:hover {
+  background-color: #45a049;
 }
 
-@keyframes App-logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 30px;
+}
+
+th, td {
+  padding: 12px 15px;
+  text-align: center;
+  border: 1px solid #ddd;
+}
+
+th {
+  background-color: #d48277;
+}
+
+tr:nth-child(even) {
+  background-color: #1b2d3f;
+}
+
+tr:hover {
+  background-color: #d48277;
 }
