@@ -398,18 +398,10 @@ function App() {
       // Wait for all submissions to complete
       const results = await Promise.all(submissionPromises);
 
-      // Count successful and failed submissions
-      const successfulSubmissions = results.filter(result => result === true).length;
-      const failedSubmissions = results.filter(result => result === null).length;
-
-      // Handle different scenarios
-      if (failedSubmissions > 0) {
-        if (failedSubmissions === results.length) {
-          alert("Failed to save scores. Please check your connection and try again.");
-          return;
-        } else {
-          alert(`Warning: ${failedSubmissions} score(s) may not have been saved. Please check your connection and try again.`);
-        }
+      // Check if any submissions failed
+      if (results.some(result => result === null)) {
+        alert("Failed to save scores. Please try again.");
+        return;
       }
 
       // Update the score table with all scores
@@ -445,7 +437,7 @@ function App() {
       alert("Scores submitted successfully!");
     } catch (error) {
       console.error("Error submitting scores:", error);
-      alert(`Error submitting scores: ${error.message}`);
+      alert("Failed to save scores. Please try again.");
     }
   };
 
