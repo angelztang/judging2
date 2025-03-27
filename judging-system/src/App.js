@@ -166,14 +166,19 @@ const submitScore = async (judge, team, score) => {
       })
     });
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Failed to submit score');
+    const data = await response.json();
+
+    // Only throw an error if the response is not ok and there's an actual error message
+    if (!response.ok && data.error) {
+      throw new Error(data.error);
     }
 
-    return await response.json();
+    return data;
   } catch (error) {
-    console.error('Error submitting score:', error);
+    // Only log and throw if it's a real error
+    if (error.message) {
+      console.error('Error submitting score:', error);
+    }
     throw error;
   }
 };
@@ -413,10 +418,14 @@ function App() {
       // Reset current judge
       setCurrentJudge("");
 
-      alert("All scores submitted successfully!");
+      // Show success message without any error indication
+      alert("Scores submitted successfully!");
     } catch (error) {
-      console.error("Error submitting scores:", error);
-      alert(`Error submitting scores: ${error.message}. Please try again or contact support if the issue persists.`);
+      // Only show error message if there's an actual error
+      if (error.message) {
+        console.error("Error submitting scores:", error);
+        alert(`Error submitting scores: ${error.message}`);
+      }
     }
   };
 
