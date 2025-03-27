@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 import psycopg2
 import logging
 from sqlalchemy import text
+from sqlalchemy.pool import QueuePool
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
@@ -28,6 +29,13 @@ CORS(app, supports_credentials=True)
 # Configure the database
 app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL.replace('postgres://', 'postgresql://')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    'poolclass': QueuePool,
+    'pool_size': 5,
+    'max_overflow': 10,
+    'pool_timeout': 30,
+    'pool_recycle': 1800
+}
 
 # Initialize database
 db = SQLAlchemy(app)
