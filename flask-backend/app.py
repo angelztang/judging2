@@ -22,23 +22,27 @@ if not DATABASE_URL:
     logger.error("DATABASE_URL environment variable is not set")
     raise ValueError("DATABASE_URL environment variable is not set")
 
+# Ensure proper format for SQLAlchemy
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
 logger.info(f"Connecting to database...")
 
 app = Flask(__name__, static_folder='static', static_url_path='')
 CORS(app, supports_credentials=True)
 
 # Configure the database
-app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL.replace('postgres://', 'postgresql://')
+app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     'poolclass': QueuePool,
-    'pool_size': 2,
-    'max_overflow': 5,
-    'pool_timeout': 10,
+    'pool_size': 1,  # Minimum pool size
+    'max_overflow': 2,  # Minimum overflow
+    'pool_timeout': 30,
     'pool_recycle': 1800,
     'connect_args': {
         'sslmode': 'require',
-        'connect_timeout': 10
+        'connect_timeout': 30
     }
 }
 
