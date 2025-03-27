@@ -141,3 +141,36 @@ body {
     z-index: 1;
   }
   
+  .range-inputs {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0 10px;
+  }
+  
+  .range-inputs input {
+    padding: 5px;
+    width: 80px;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+    background-color: #fff;
+  }
+  
+  .range-inputs span {
+    color: #f1ead2;
+  }
+  
+  .range-inputs button {
+    padding: 5px 10px;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+    background-color: #1b2d3f;
+    color: #f1ead2;
+    cursor: pointer;
+    margin-left: 10px;
+  }
+  
+  .range-inputs button:hover {
+    background-color: #2a3f55;
+  }
+  

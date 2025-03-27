@@ -32,12 +32,13 @@ app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL.replace('postgres://', 'pos
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     'poolclass': QueuePool,
-    'pool_size': 5,
-    'max_overflow': 10,
-    'pool_timeout': 30,
+    'pool_size': 2,
+    'max_overflow': 5,
+    'pool_timeout': 10,
     'pool_recycle': 1800,
     'connect_args': {
-        'sslmode': 'require'
+        'sslmode': 'require',
+        'connect_timeout': 10
     }
 }
 
@@ -67,11 +68,15 @@ class Score(db.Model):
 def init_db():
     try:
         with app.app_context():
-            # Test the connection first
-            db.engine.connect()
+            # Test the connection first with timeout
+            logger.info("Testing database connection...")
+            connection = db.engine.connect()
+            connection.execute(text("SELECT 1"))
+            connection.close()
             logger.info("Database connection successful")
             
             # Create tables
+            logger.info("Creating database tables...")
             db.create_all()
             logger.info("Database tables created successfully")
             
@@ -82,9 +87,13 @@ def init_db():
             
     except SQLAlchemyError as e:
         logger.error(f"Database error: {str(e)}")
+        logger.error(f"Error type: {type(e).__name__}")
+        logger.error(f"Error details: {str(e.__dict__)}")
         raise
     except Exception as e:
         logger.error(f"Error initializing database: {str(e)}")
+        logger.error(f"Error type: {type(e).__name__}")
+        logger.error(f"Error details: {str(e.__dict__)}")
         raise
 
 # Initialize database on startup
