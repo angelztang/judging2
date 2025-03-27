@@ -168,16 +168,19 @@ const submitScore = async (judge, team, score) => {
 
     const data = await response.json();
 
-    // Return true on success, null on network error, throw other errors
-    if (!response.ok) {
-      if (response.status === 0) {
-        console.error('Network error');
-        return null;
-      }
-      throw new Error(data.error || 'Failed to submit score');
+    // Handle network errors
+    if (response.status === 0) {
+      console.error('Network error');
+      return null;
     }
 
-    return true;
+    // Handle success responses (200-299)
+    if (response.ok) {
+      return true;
+    }
+
+    // Handle error responses
+    throw new Error(data.error || 'Failed to submit score');
   } catch (error) {
     // Don't throw network errors, just return null
     if (error.message === 'Failed to fetch') {
@@ -395,15 +398,23 @@ function App() {
       // Wait for all submissions to complete
       const results = await Promise.all(submissionPromises);
 
-      // Check if any submissions failed
-      const failedSubmissions = results.filter(result => result === null);
-      
-      if (failedSubmissions.length > 0) {
-        if (failedSubmissions.length === results.length) {
+      // Count successful and failed submissions
+      const successfulSubmissions = results.filter(result => result === true).length;
+      const failedSubmissions = results.filter(result => result === null).length;
+      const errorSubmissions = results.filter(result => result === undefined).length;
+
+      // Handle different scenarios
+      if (errorSubmissions > 0) {
+        alert("Some scores failed to save. Please try again.");
+        return;
+      }
+
+      if (failedSubmissions > 0) {
+        if (failedSubmissions === results.length) {
           alert("Failed to save scores. Please check your connection and try again.");
           return;
         } else {
-          alert(`Warning: ${failedSubmissions.length} score(s) may not have been saved. Please check your connection and try again.`);
+          alert(`Warning: ${failedSubmissions} score(s) may not have been saved. Please check your connection and try again.`);
         }
       }
 
