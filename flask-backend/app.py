@@ -7,6 +7,7 @@ import psycopg2
 import logging
 from sqlalchemy import text
 from sqlalchemy.pool import QueuePool
+from sqlalchemy.exc import SQLAlchemyError
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
@@ -34,7 +35,10 @@ app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     'pool_size': 5,
     'max_overflow': 10,
     'pool_timeout': 30,
-    'pool_recycle': 1800
+    'pool_recycle': 1800,
+    'connect_args': {
+        'sslmode': 'require'
+    }
 }
 
 # Initialize database
@@ -63,26 +67,37 @@ class Score(db.Model):
 def init_db():
     try:
         with app.app_context():
+            # Test the connection first
+            db.engine.connect()
+            logger.info("Database connection successful")
+            
+            # Create tables
             db.create_all()
             logger.info("Database tables created successfully")
+            
+            # Verify tables exist
+            result = db.session.execute(text("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'"))
+            tables = [row[0] for row in result]
+            logger.info(f"Available tables: {tables}")
+            
+    except SQLAlchemyError as e:
+        logger.error(f"Database error: {str(e)}")
+        raise
     except Exception as e:
-        logger.error(f"Error creating database tables: {str(e)}")
+        logger.error(f"Error initializing database: {str(e)}")
         raise
 
 # Initialize database on startup
 init_db()
 
 def get_db_connection():
-    if 'supabase' in DATABASE_URL:
-        # Supabase connection
+    try:
+        # Always use SSL for Heroku PostgreSQL
         conn = psycopg2.connect(DATABASE_URL, sslmode='require')
-    elif 'amazonaws.com' in DATABASE_URL:
-        # Heroku PostgreSQL connection
-        conn = psycopg2.connect(DATABASE_URL, sslmode='require')
-    else:
-        # Local connection
-        conn = psycopg2.connect(DATABASE_URL)
-    return conn
+        return conn
+    except Exception as e:
+        logger.error(f"Error connecting to database: {str(e)}")
+        raise
 
 # API Routes
 @app.route('/api/scores', methods=['GET'])
