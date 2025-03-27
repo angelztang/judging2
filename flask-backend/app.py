@@ -25,7 +25,7 @@ if not DATABASE_URL:
 if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
-logger.info(f"Connecting to database...")
+logger.info(f"Connecting to database with URL: {DATABASE_URL}")
 
 app = Flask(__name__, static_folder='static', static_url_path='')
 CORS(app, supports_credentials=True)
