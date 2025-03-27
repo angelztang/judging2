@@ -73,25 +73,38 @@ def submit_score():
     try:
         data = request.get_json()
         print("Received score data:", data)
+        print("Current database URL:", os.environ.get('DATABASE_URL'))
         
         if not data or not all(key in data for key in ['judge_id', 'team_id', 'score']):
+            print("Missing required data in request")
             return jsonify({"error": "Missing required data"}), 400
         
         judge_id = data['judge_id']
         team_id = data['team_id']
         score = float(data['score'])
         
+        print(f"Processing score - Judge: {judge_id}, Team: {team_id}, Score: {score}")
+        
         if not (0 <= score <= 10):
+            print(f"Invalid score value: {score}")
             return jsonify({"error": "Score must be between 0 and 10"}), 400
         
         # Only add the score if it doesn't exist
         existing_score = Score.query.filter_by(judge_id=judge_id, team_id=team_id).first()
+        print(f"Existing score found: {existing_score}")
+        
         if not existing_score:
             new_score = Score(judge_id=judge_id, team_id=team_id, score=score)
             db.session.add(new_score)
             print(f"Adding new score for {judge_id}, {team_id}: {score}")
-            db.session.commit()
-            return jsonify({"message": "Score submitted successfully!"}), 201
+            try:
+                db.session.commit()
+                print("Successfully committed to database")
+                return jsonify({"message": "Score submitted successfully!"}), 201
+            except Exception as commit_error:
+                print(f"Error during commit: {commit_error}")
+                db.session.rollback()
+                raise commit_error
         else:
             print(f"Ignoring duplicate score for {judge_id}, {team_id}")
             return jsonify({"message": "Score already exists, ignoring duplicate"}), 200
@@ -101,7 +114,8 @@ def submit_score():
         return jsonify({"error": "Invalid score value"}), 400
     except Exception as e:
         print(f"Error submitting score: {e}")
-        db.session.rollback()
+        if 'db' in globals() and db is not None:
+            db.session.rollback()
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
