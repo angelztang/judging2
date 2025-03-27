@@ -26,12 +26,7 @@ app = Flask(__name__, static_folder='static', static_url_path='')
 CORS(app, supports_credentials=True)
 
 # Configure the database
-# For Supabase, we need to modify the URL slightly
-if 'supabase' in DATABASE_URL:
-    app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL.replace('postgres://', 'postgresql://')
-else:
-    app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL.replace('postgres://', 'postgresql://')
-
+app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL.replace('postgres://', 'postgresql://')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Initialize database
@@ -56,20 +51,18 @@ class Score(db.Model):
         self.score = score
         self.timestamp = None
 
-# Test the connection
-try:
-    with app.app_context():
-        db.engine.connect()
-        # Create tables if they don't exist
-        db.create_all()
-        # Verify no automatic score creation
-        initial_scores = Score.query.all()
-        if initial_scores:
-            logger.info(f"Found {len(initial_scores)} initial scores")
-    logger.info("Database connection successful!")
-except Exception as e:
-    logger.error(f"Error connecting to database: {str(e)}")
-    raise
+# Initialize database tables
+def init_db():
+    try:
+        with app.app_context():
+            db.create_all()
+            logger.info("Database tables created successfully")
+    except Exception as e:
+        logger.error(f"Error creating database tables: {str(e)}")
+        raise
+
+# Initialize database on startup
+init_db()
 
 def get_db_connection():
     if 'supabase' in DATABASE_URL:
