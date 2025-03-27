@@ -26,7 +26,12 @@ app = Flask(__name__, static_folder='static', static_url_path='')
 CORS(app, supports_credentials=True)
 
 # Configure the database
-app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL.replace('postgres://', 'postgresql://')
+# For Supabase, we need to modify the URL slightly
+if 'supabase' in DATABASE_URL:
+    app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL.replace('postgres://', 'postgresql://')
+else:
+    app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL.replace('postgres://', 'postgresql://')
+
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Initialize database
@@ -67,9 +72,14 @@ except Exception as e:
     raise
 
 def get_db_connection():
-    if 'amazonaws.com' in DATABASE_URL:
+    if 'supabase' in DATABASE_URL:
+        # Supabase connection
+        conn = psycopg2.connect(DATABASE_URL, sslmode='require')
+    elif 'amazonaws.com' in DATABASE_URL:
+        # Heroku PostgreSQL connection
         conn = psycopg2.connect(DATABASE_URL, sslmode='require')
     else:
+        # Local connection
         conn = psycopg2.connect(DATABASE_URL)
     return conn
 
