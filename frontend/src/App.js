@@ -144,9 +144,15 @@ function App() {
     return teamsList;
   });
   
-  // Initialize empty states without localStorage
-  const [currentTeamsByJudge, setCurrentTeamsByJudge] = useState({});
-  const [scoresByJudge, setScoresByJudge] = useState({});
+  // Initialize states with localStorage data
+  const [currentTeamsByJudge, setCurrentTeamsByJudge] = useState(() => {
+    const saved = localStorage.getItem('currentTeamsByJudge');
+    return saved ? JSON.parse(saved) : {};
+  });
+  const [scoresByJudge, setScoresByJudge] = useState(() => {
+    const saved = localStorage.getItem('scoresByJudge');
+    return saved ? JSON.parse(saved) : {};
+  });
   const [isAssigningTeams, setIsAssigningTeams] = useState(false);
   
   // Load judges from localStorage on initial render
@@ -162,14 +168,18 @@ function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [tempTeamRange, setTempTeamRange] = useState({ start: 51, end: 99 });
 
-  // Only save judges and team range to localStorage
+  // Save current teams and scores to localStorage whenever they change
   useEffect(() => {
-    localStorage.setItem('judges', JSON.stringify(judges));
-  }, [judges]);
+    if (Object.keys(currentTeamsByJudge).length > 0) {
+      localStorage.setItem('currentTeamsByJudge', JSON.stringify(currentTeamsByJudge));
+    }
+  }, [currentTeamsByJudge]);
 
   useEffect(() => {
-    localStorage.setItem('teamRange', JSON.stringify(teamRange));
-  }, [teamRange]);
+    if (Object.keys(scoresByJudge).length > 0) {
+      localStorage.setItem('scoresByJudge', JSON.stringify(scoresByJudge));
+    }
+  }, [scoresByJudge]);
 
   useEffect(() => {
     const loadData = async () => {
