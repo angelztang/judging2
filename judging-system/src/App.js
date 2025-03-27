@@ -156,19 +156,24 @@ const getWeightedRandomTeams = (availableTeams, seenTeams, count, seenTeamsByJud
 // Add error handling for score submission
 const submitScore = async (judge, team, score) => {
   try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+
     const response = await fetch(`${BACKEND_URL}/api/scores`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
       body: JSON.stringify({
         judge: judge,
         team: team,
         score: score
       }),
-      // Add these options to prevent the browser from showing the error
       mode: 'cors',
-      credentials: 'same-origin',
-      keepalive: true
-    });
+      credentials: 'omit',
+      signal: controller.signal
+    }).finally(() => clearTimeout(timeoutId));
 
     // If we can't reach the server, return null without throwing
     if (!response) return null;
@@ -389,24 +394,28 @@ function App() {
       // Create an array of promises for all score submissions
       const submissionPromises = currentTeams.map((team, i) => {
         const score = parseFloat(currentScores[i]);
-        return submitScore(currentJudge, team, score);
+        return submitScore(currentJudge, team, score).catch(() => null);
       });
 
       // Wait for all submissions to complete
-      const results = await Promise.all(submissionPromises.map(p => p.catch(() => null)));
+      const results = await Promise.all(submissionPromises);
 
-      // If all submissions failed, silently retry once
+      // If all submissions failed, silently retry once with a delay between each request
       if (results.every(result => result === null)) {
         // Wait a moment before retrying
         await new Promise(resolve => setTimeout(resolve, 1000));
         
-        // Retry submissions
-        const retryPromises = currentTeams.map((team, i) => {
+        // Retry submissions one at a time with delays
+        const retryResults = [];
+        for (let i = 0; i < currentTeams.length; i++) {
           const score = parseFloat(currentScores[i]);
-          return submitScore(currentJudge, team, score);
-        });
-        
-        const retryResults = await Promise.all(retryPromises.map(p => p.catch(() => null)));
+          const result = await submitScore(currentJudge, currentTeams[i], score).catch(() => null);
+          retryResults.push(result);
+          // Add a small delay between requests
+          if (i < currentTeams.length - 1) {
+            await new Promise(resolve => setTimeout(resolve, 200));
+          }
+        }
         
         // If retry also failed, just proceed without showing error
         if (retryResults.every(result => result === null)) {
