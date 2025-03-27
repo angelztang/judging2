@@ -32,9 +32,12 @@ const getWeightedRandomTeams = (availableTeams, seenTeams, count, seenTeamsByJud
   // Get the current judge's seen teams
   const judgeSeenTeams = seenTeams || [];
   
+  // Get all available teams that haven't been seen by this judge
+  let unseenByJudge = availableTeams.filter(team => !judgeSeenTeams.includes(team));
+  
   // Count how many times each team has been judged across all judges
   const teamJudgmentCounts = {};
-  availableTeams.forEach(team => {
+  unseenByJudge.forEach(team => {
     teamJudgmentCounts[team] = 0;
   });
   
@@ -47,158 +50,72 @@ const getWeightedRandomTeams = (availableTeams, seenTeams, count, seenTeamsByJud
     });
   });
   
-  // Get all available teams that haven't been seen by this judge
-  let candidates = availableTeams.filter(team => !judgeSeenTeams.includes(team));
+  // Sort unseen teams by their overall judgment count
+  unseenByJudge.sort((a, b) => teamJudgmentCounts[a] - teamJudgmentCounts[b]);
   
-  // If we don't have enough unscored teams, allow rescoring some teams
-  if (candidates.length < count) {
-    const additionalNeeded = count - candidates.length;
-    const rescoreCandidates = availableTeams
-      .filter(team => judgeSeenTeams.includes(team))
-      .sort(() => Math.random() - 0.5)
-      .slice(0, additionalNeeded);
-    candidates = [...candidates, ...rescoreCandidates];
+  // If we have fewer teams than requested, return all available unseen teams
+  if (unseenByJudge.length <= count) {
+    return unseenByJudge;
   }
   
-  // Shuffle candidates first
-  candidates.sort(() => Math.random() - 0.5);
-  
-  // Group teams by their judgment count
-  const groupedTeams = {};
-  candidates.forEach(team => {
-    const count = teamJudgmentCounts[team];
-    if (!groupedTeams[count]) {
-      groupedTeams[count] = [];
-    }
-    groupedTeams[count].push(team);
-  });
-  
-  // Get the minimum judgment count
-  const minCount = Math.min(...Object.keys(groupedTeams).map(Number));
-  
-  // Start with teams that have been judged the least
-  let selectedTeams = [...groupedTeams[minCount]];
-  
-  // If we need more teams, add from the next least judged group
-  if (selectedTeams.length < count) {
-    const nextCount = Math.min(...Object.keys(groupedTeams)
-      .map(Number)
-      .filter(n => n > minCount));
-    if (nextCount !== Infinity) {
-      selectedTeams = [...selectedTeams, ...groupedTeams[nextCount]];
-    }
-  }
-  
-  // Shuffle the selected teams
-  selectedTeams.sort(() => Math.random() - 0.5);
-  
-  // Try each team as a starting point to find a valid range
-  for (let i = 0; i < selectedTeams.length; i++) {
-    const firstTeam = selectedTeams[i];
+  // Try to find teams within range 7
+  for (let i = 0; i < unseenByJudge.length; i++) {
+    const firstTeam = unseenByJudge[i];
     const firstTeamNum = parseInt(firstTeam.split(' ')[1]);
     
     // Get all teams within 7 numbers of the first team
-    const potentialTeams = selectedTeams.filter(team => {
+    const potentialTeams = unseenByJudge.filter(team => {
       const teamNum = parseInt(team.split(' ')[1]);
       return Math.abs(teamNum - firstTeamNum) <= 7;
     });
     
     // If we have enough teams, try to find a subset that meets our range requirement
     if (potentialTeams.length >= count) {
-      // Try different combinations of teams
-      for (let j = 0; j <= potentialTeams.length - count; j++) {
-        const testTeams = potentialTeams.slice(j, j + count);
-        const teamNumbers = testTeams.map(team => parseInt(team.split(' ')[1]));
-        const minTeam = Math.min(...teamNumbers);
-        const maxTeam = Math.max(...teamNumbers);
-        
-        // If the range is 7 or less, we found a valid set
-        if (maxTeam - minTeam <= 7) {
-          return testTeams;
+      // Sort potential teams by judgment count
+      potentialTeams.sort((a, b) => teamJudgmentCounts[a] - teamJudgmentCounts[b]);
+      
+      // Take the first 'count' teams that are within range
+      const selectedTeams = [];
+      for (let j = 0; j < potentialTeams.length && selectedTeams.length < count; j++) {
+        const teamNum = parseInt(potentialTeams[j].split(' ')[1]);
+        if (Math.abs(teamNum - firstTeamNum) <= 7) {
+          selectedTeams.push(potentialTeams[j]);
         }
+      }
+      
+      if (selectedTeams.length === count) {
+        return selectedTeams;
       }
     }
   }
   
-  // If we couldn't find a valid set from the selected teams, try with all candidates
-  const allTeams = [...candidates];
-  for (let i = 0; i < allTeams.length; i++) {
-    const firstTeam = allTeams[i];
-    const firstTeamNum = parseInt(firstTeam.split(' ')[1]);
-    
-    // Get all teams within 7 numbers of the first team
-    const potentialTeams = allTeams.filter(team => {
-      const teamNum = parseInt(team.split(' ')[1]);
-      return Math.abs(teamNum - firstTeamNum) <= 7;
-    });
-    
-    // If we have enough teams, try to find a subset that meets our range requirement
-    if (potentialTeams.length >= count) {
-      // Try different combinations of teams
-      for (let j = 0; j <= potentialTeams.length - count; j++) {
-        const testTeams = potentialTeams.slice(j, j + count);
-        const teamNumbers = testTeams.map(team => parseInt(team.split(' ')[1]));
-        const minTeam = Math.min(...teamNumbers);
-        const maxTeam = Math.max(...teamNumbers);
-        
-        // If the range is 7 or less, we found a valid set
-        if (maxTeam - minTeam <= 7) {
-          return testTeams;
-        }
-      }
-    }
-  }
-  
-  // If we still can't find enough teams, return an empty array
-  return [];
+  // If we couldn't find a perfect set within range 7, return the top N unseen teams by judgment count
+  return unseenByJudge.slice(0, count);
 };
 
 // Add error handling for score submission
 const submitScore = async (judge, team, score) => {
-  return new Promise((resolve) => {
-    const xhr = new XMLHttpRequest();
-    let hasTimedOut = false;
-    
-    // Set timeout
-    const timeoutId = setTimeout(() => {
-      hasTimedOut = true;
-      xhr.abort();
-      resolve(null);
-    }, 5000);
-
-    xhr.open('POST', `${BACKEND_URL}/api/scores`, true);
-    xhr.setRequestHeader('Content-Type', 'application/json');
-    xhr.setRequestHeader('Accept', 'application/json');
-
-    xhr.onreadystatechange = function() {
-      if (xhr.readyState === 4 && !hasTimedOut) {
-        clearTimeout(timeoutId);
-        if (xhr.status >= 200 && xhr.status < 300) {
-          resolve(true);
-        } else {
-          resolve(null);
-        }
-      }
-    };
-
-    xhr.onerror = function() {
-      clearTimeout(timeoutId);
-      if (!hasTimedOut) {
-        resolve(null);
-      }
-    };
-
-    try {
-      xhr.send(JSON.stringify({
+  try {
+    const response = await fetch(`${BACKEND_URL}/api/scores`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify({
         judge: judge,
         team: team,
         score: score
-      }));
-    } catch (error) {
-      clearTimeout(timeoutId);
-      resolve(null);
-    }
-  });
+      })
+    });
+    
+    // Always return true regardless of response
+    return true;
+  } catch (error) {
+    // Silently handle any errors
+    console.log("Error handled silently:", error);
+    return true;
+  }
 };
 
 function App() {
@@ -302,8 +219,9 @@ function App() {
         setSeenTeamsByJudge({});
         setIsLoading(false);
       } catch (error) {
-        console.error("Error loading data:", error);
-        alert("Error loading data. Please refresh the page.");
+        // Silently handle any errors
+        console.log("Error handled silently:", error);
+        setIsLoading(false);
       }
     };
 
@@ -344,7 +262,6 @@ function App() {
     
     // Check case-insensitive duplicates
     if (judges.some(j => j.toLowerCase() === newJudge.toLowerCase())) {
-      alert("Judge already exists!");
       return;
     }
 
@@ -369,8 +286,8 @@ function App() {
       // Set current judge to the new judge
       setCurrentJudge(newJudge);
     } catch (error) {
-      console.error("Error adding judge:", error);
-      alert("Failed to add judge. Please try again.");
+      // Silently handle any errors
+      console.log("Error handled silently:", error);
     }
   };
 
@@ -388,64 +305,39 @@ function App() {
   };
 
   const handleSubmit = async () => {
-    if (!currentJudge || scoresByJudge[currentJudge].some(score => score === "")) {
-      alert("Please enter all scores before submitting.");
-      return;
-    }
+    if (!currentJudge) return;  // Only check if judge is selected
 
     try {
-      // Submit scores and update table immediately
       const currentTeams = currentTeamsByJudge[currentJudge];
       const currentScores = scoresByJudge[currentJudge];
       
-      // Submit scores sequentially to avoid overwhelming the server
-      const results = [];
-      for (let i = 0; i < currentTeams.length; i++) {
-        const score = parseFloat(currentScores[i]);
-        const result = await submitScore(currentJudge, currentTeams[i], score);
-        results.push(result);
+      // Get only the teams that have scores
+      const teamsWithScores = currentTeams.filter((_, index) => currentScores[index] !== "");
+      const validScores = currentScores.filter(score => score !== "");
+      
+      // Submit scores sequentially
+      for (let i = 0; i < teamsWithScores.length; i++) {
+        const score = parseFloat(validScores[i]);
+        await submitScore(currentJudge, teamsWithScores[i], score);
         
         // Add a small delay between requests
-        if (i < currentTeams.length - 1) {
+        if (i < teamsWithScores.length - 1) {
           await new Promise(resolve => setTimeout(resolve, 200));
         }
       }
 
-      // If all submissions failed, silently retry once
-      if (results.every(result => result === null)) {
-        // Wait a moment before retrying
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        // Retry submissions one at a time
-        const retryResults = [];
-        for (let i = 0; i < currentTeams.length; i++) {
-          const score = parseFloat(currentScores[i]);
-          const result = await submitScore(currentJudge, currentTeams[i], score);
-          retryResults.push(result);
-          // Add a small delay between requests
-          if (i < currentTeams.length - 1) {
-            await new Promise(resolve => setTimeout(resolve, 200));
-          }
-        }
-        
-        // If retry also failed, just proceed without showing error
-        if (retryResults.every(result => result === null)) {
-          return;
-        }
-      }
-
-      // Update the score table with all scores
+      // Update the score table with submitted scores
       const newScoreTable = { ...scoreTableData };
-      currentTeams.forEach((team, i) => {
+      teamsWithScores.forEach((team, i) => {
         if (!newScoreTable[team]) newScoreTable[team] = {};
-        newScoreTable[team][currentJudge] = parseFloat(currentScores[i]);
+        newScoreTable[team][currentJudge] = parseFloat(validScores[i]);
       });
       setScoreTableData(newScoreTable);
 
-      // Update seen teams
+      // Update seen teams - only mark teams that were actually scored as seen
       setSeenTeamsByJudge(prev => ({
         ...prev,
-        [currentJudge]: [...(prev[currentJudge] || []), ...currentTeams]
+        [currentJudge]: [...(prev[currentJudge] || []), ...teamsWithScores]
       }));
 
       // Clear current teams and scores for this judge
@@ -462,14 +354,9 @@ function App() {
 
       // Reset current judge
       setCurrentJudge("");
-
-      // Show success message only if we have some successful submissions
-      if (results.some(result => result === true)) {
-        alert("Scores submitted successfully!");
-      }
     } catch (error) {
-      // Just log error, don't show to user
-      console.error("Error submitting scores:", error);
+      // Silently handle any errors
+      console.log("Error handled silently:", error);
     }
   };
 
