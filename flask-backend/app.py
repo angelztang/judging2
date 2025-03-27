@@ -3,7 +3,6 @@ from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 import os
 from dotenv import load_dotenv
-import psycopg2
 import logging
 from sqlalchemy import text
 from sqlalchemy.pool import QueuePool
@@ -36,13 +35,13 @@ app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     'poolclass': QueuePool,
-    'pool_size': 1,  # Minimum pool size
-    'max_overflow': 2,  # Minimum overflow
-    'pool_timeout': 30,
+    'pool_size': 1,
+    'max_overflow': 1,
+    'pool_timeout': 10,
     'pool_recycle': 1800,
     'connect_args': {
         'sslmode': 'require',
-        'connect_timeout': 30
+        'connect_timeout': 10
     }
 }
 
@@ -74,9 +73,8 @@ def init_db():
         with app.app_context():
             # Test the connection first with timeout
             logger.info("Testing database connection...")
-            connection = db.engine.connect()
-            connection.execute(text("SELECT 1"))
-            connection.close()
+            db.session.execute(text("SELECT 1"))
+            db.session.commit()
             logger.info("Database connection successful")
             
             # Create tables
@@ -103,25 +101,15 @@ def init_db():
 # Initialize database on startup
 init_db()
 
-def get_db_connection():
-    try:
-        # Always use SSL for Heroku PostgreSQL
-        conn = psycopg2.connect(DATABASE_URL, sslmode='require')
-        return conn
-    except Exception as e:
-        logger.error(f"Error connecting to database: {str(e)}")
-        raise
-
 # API Routes
 @app.route('/api/scores', methods=['GET'])
 def get_scores():
     try:
         logger.info("Fetching scores...")
-        with app.app_context():
-            scores = Score.query.all()
-            scores_data = [{"judge": score.judge, "team": score.team, "score": score.score} for score in scores]
-            logger.info(f"Found {len(scores_data)} scores")
-            return jsonify(scores_data)
+        scores = Score.query.all()
+        scores_data = [{"judge": score.judge, "team": score.team, "score": score.score} for score in scores]
+        logger.info(f"Found {len(scores_data)} scores")
+        return jsonify(scores_data)
     except Exception as e:
         logger.error(f"Error fetching scores: {str(e)}")
         logger.error(f"Error type: {type(e).__name__}")
