@@ -437,6 +437,40 @@ function App() {
     }
   }, [seenTeamsByJudge]);
 
+  const resetJudges = async () => {
+    if (window.confirm('Are you sure you want to reset all judges? This will clear all seen teams and scores.')) {
+      try {
+        // Clear all state
+        setJudges([]);
+        setCurrentTeamsByJudge({});
+        setScoresByJudge({});
+        setSeenTeamsByJudge({});
+        setScoreTableData({});
+        setCurrentJudge("");
+
+        // Clear localStorage
+        localStorage.removeItem('judges');
+        localStorage.removeItem('currentTeamsByJudge');
+        localStorage.removeItem('scoresByJudge');
+        localStorage.removeItem('seenTeamsByJudge');
+
+        // Clear backend data
+        const response = await fetch(`${BACKEND_URL}/api/scores`, {
+          method: 'DELETE'
+        });
+
+        // if (!response.ok) {
+        //   throw new Error('Failed to clear scores from database');
+        // }
+
+        alert('All judges have been reset successfully!');
+      } catch (error) {
+        console.error('Error resetting judges:', error);
+        alert('An error occurred while resetting judges. Please try again.');
+      }
+    }
+  };
+
   return (
     <div className="container">
       <h1>Hackathon Judging System</h1>
@@ -468,7 +502,7 @@ function App() {
                 borderRadius: '4px',
                 marginBottom: '20px'
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
                   <label style={{ color: '#f1ead2' }}>Team Range: </label>
                   <div className="range-inputs">
                     <input
@@ -491,6 +525,19 @@ function App() {
                     Update Range
                   </button>
                 </div>
+                <button 
+                  onClick={resetJudges}
+                  style={{
+                    backgroundColor: '#dc3545',
+                    color: 'white',
+                    border: 'none',
+                    padding: '8px 16px',
+                    borderRadius: '4px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Reset All Judges
+                </button>
               </div>
             )}
           </div>
