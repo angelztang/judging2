@@ -155,43 +155,50 @@ const getWeightedRandomTeams = (availableTeams, seenTeams, count, seenTeamsByJud
 
 // Add error handling for score submission
 const submitScore = async (judge, team, score) => {
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+  return new Promise((resolve) => {
+    const xhr = new XMLHttpRequest();
+    let hasTimedOut = false;
+    
+    // Set timeout
+    const timeoutId = setTimeout(() => {
+      hasTimedOut = true;
+      xhr.abort();
+      resolve(null);
+    }, 5000);
 
-    const response = await fetch(`${BACKEND_URL}/api/scores`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      },
-      body: JSON.stringify({
+    xhr.open('POST', `${BACKEND_URL}/api/scores`, true);
+    xhr.setRequestHeader('Content-Type', 'application/json');
+    xhr.setRequestHeader('Accept', 'application/json');
+
+    xhr.onreadystatechange = function() {
+      if (xhr.readyState === 4 && !hasTimedOut) {
+        clearTimeout(timeoutId);
+        if (xhr.status >= 200 && xhr.status < 300) {
+          resolve(true);
+        } else {
+          resolve(null);
+        }
+      }
+    };
+
+    xhr.onerror = function() {
+      clearTimeout(timeoutId);
+      if (!hasTimedOut) {
+        resolve(null);
+      }
+    };
+
+    try {
+      xhr.send(JSON.stringify({
         judge: judge,
         team: team,
         score: score
-      }),
-      mode: 'cors',
-      credentials: 'omit',
-      signal: controller.signal
-    }).finally(() => clearTimeout(timeoutId));
-
-    // If we can't reach the server, return null without throwing
-    if (!response) return null;
-
-    const data = await response.json();
-
-    // Handle success responses (200-299)
-    if (response.ok || response.status === 201) {
-      return true;
+      }));
+    } catch (error) {
+      clearTimeout(timeoutId);
+      resolve(null);
     }
-
-    // For any other response, return null instead of throwing
-    return null;
-  } catch (error) {
-    // Return null for all errors instead of throwing
-    console.error('Error submitting score:', error);
-    return null;
-  }
+  });
 };
 
 function App() {
@@ -391,25 +398,29 @@ function App() {
       const currentTeams = currentTeamsByJudge[currentJudge];
       const currentScores = scoresByJudge[currentJudge];
       
-      // Create an array of promises for all score submissions
-      const submissionPromises = currentTeams.map((team, i) => {
+      // Submit scores sequentially to avoid overwhelming the server
+      const results = [];
+      for (let i = 0; i < currentTeams.length; i++) {
         const score = parseFloat(currentScores[i]);
-        return submitScore(currentJudge, team, score).catch(() => null);
-      });
+        const result = await submitScore(currentJudge, currentTeams[i], score);
+        results.push(result);
+        
+        // Add a small delay between requests
+        if (i < currentTeams.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 200));
+        }
+      }
 
-      // Wait for all submissions to complete
-      const results = await Promise.all(submissionPromises);
-
-      // If all submissions failed, silently retry once with a delay between each request
+      // If all submissions failed, silently retry once
       if (results.every(result => result === null)) {
         // Wait a moment before retrying
         await new Promise(resolve => setTimeout(resolve, 1000));
         
-        // Retry submissions one at a time with delays
+        // Retry submissions one at a time
         const retryResults = [];
         for (let i = 0; i < currentTeams.length; i++) {
           const score = parseFloat(currentScores[i]);
-          const result = await submitScore(currentJudge, currentTeams[i], score).catch(() => null);
+          const result = await submitScore(currentJudge, currentTeams[i], score);
           retryResults.push(result);
           // Add a small delay between requests
           if (i < currentTeams.length - 1) {
@@ -457,7 +468,7 @@ function App() {
         alert("Scores submitted successfully!");
       }
     } catch (error) {
-      // Log error but don't show to user
+      // Just log error, don't show to user
       console.error("Error submitting scores:", error);
     }
   };
