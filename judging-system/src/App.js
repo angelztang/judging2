@@ -168,12 +168,16 @@ const submitScore = async (judge, team, score) => {
 
     const data = await response.json();
 
-    // Only throw an error if the response is not ok and there's an actual error message
-    if (!response.ok && data.error) {
-      throw new Error(data.error);
+    // Return true on success, null on network error, throw other errors
+    if (!response.ok) {
+      if (response.status === 0) {
+        console.error('Network error');
+        return null;
+      }
+      throw new Error(data.error || 'Failed to submit score');
     }
 
-    return data;
+    return true;
   } catch (error) {
     // Don't throw network errors, just return null
     if (error.message === 'Failed to fetch') {
@@ -392,9 +396,15 @@ function App() {
       const results = await Promise.all(submissionPromises);
 
       // Check if any submissions failed
-      if (results.some(result => result === null)) {
-        alert("Some scores may not have been saved due to network issues. Please check your connection and try again.");
-        return;
+      const failedSubmissions = results.filter(result => result === null);
+      
+      if (failedSubmissions.length > 0) {
+        if (failedSubmissions.length === results.length) {
+          alert("Failed to save scores. Please check your connection and try again.");
+          return;
+        } else {
+          alert(`Warning: ${failedSubmissions.length} score(s) may not have been saved. Please check your connection and try again.`);
+        }
       }
 
       // Update the score table with all scores
@@ -429,11 +439,8 @@ function App() {
       // Show success message
       alert("Scores submitted successfully!");
     } catch (error) {
-      // Only show error message if it's not a network error
-      if (error.message && error.message !== 'Failed to fetch') {
-        console.error("Error submitting scores:", error);
-        alert(`Error submitting scores: ${error.message}`);
-      }
+      console.error("Error submitting scores:", error);
+      alert(`Error submitting scores: ${error.message}`);
     }
   };
 
