@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hackathon Judging</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f7fc;
+            margin: 0;
+            padding: 0;
+        }
+        header {
+            background-color: #4CAF50;
+            color: white;
+            padding: 15px;
+            text-align: center;
+        }
+        .container {
+            width: 80%;
+            margin: 20px auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        select, input[type="number"], button {
+            padding: 10px;
+            font-size: 16px;
+            margin-bottom: 15px;
+            width: 100%;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        input[type="number"] {
+            width: 30%;
+        }
+        label {
+            font-weight: bold;
+            margin-bottom: 8px;
+            display: block;
+        }
+        h3 {
+            margin-top: 30px;
+            margin-bottom: 15px;
+            color: #333;
+        }
+        .team-container {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 15px;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-size: 18px;
+            padding: 10px;
+            width: auto;
+            margin-top: 20px;
+            border-radius: 5px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Hackathon Judging System</h1>
+</header>
+
+<div class="container">
+    <form action="/submit_scores" method="POST">
+        
+        <!-- Judge Selection -->
+        <label for="judge">Select Judge:</label>
+        <select name="judge" id="judge">
+            <option value="" disabled selected>Select a Judge</option>
+            {% for judge in judges %}
+                <!-- <option value="{{ judge }}">{{ judge }}</option> -->
+            {% endfor %}
+        </select>
+        <button type="button" onclick="addJudge()">Add Judge</button>
+
+        <!-- Team Scoring Section -->
+        <div id="teamScores" class="team-scores" style="display:none;">
+            <h3>Score the following teams:</h3>
+            <div id="teamsContainer"></div>
+            
+            <button type="submit">Submit Scores</button>
+        </div>
+
+        <!-- Generate Teams Button at the Bottom -->
+        <button type="button" onclick="generateNextTeams()">Generate Next Teams</button>
+
+    </form>
+</div>
+
+<div class="container">
+    <h3>Submit a Score</h3>
+    <form action="/submit_score" method="POST">
+        <label for="team_name">Team Name:</label>
+        <input type="text" id="team_name" name="team_name" placeholder="Enter team name" required>
+        <label style="margin-top: 15px;">Score:</label>
+        <input type="number" id="score" name="score" min="1" max="5" required>
+
+        <button type="submit">Submit Score</button>
+    </form>
+</div>
+
+<script>
+    function addJudge() {
+        let newJudge = prompt("Enter the new judge's name:");
+        if (newJudge) {
+            let select = document.getElementById("judge");
+            let option = document.createElement("option");
+            option.value = newJudge;
+            option.textContent = newJudge;
+            select.appendChild(option);
+            alert("Judge added successfully!");
+        }
+    }
+
+    function generateNextTeams() {
+        let selectedJudge = document.getElementById("judge").value;
+        let teamsContainer = document.getElementById("teamsContainer");
+        let teamScoresSection = document.getElementById("teamScores");
+
+        if (!selectedJudge) {
+            alert("Please select a judge first!");
+            return;
+        }
+
+        // Dummy teams for demonstration (Replace with real logic)
+        let nextTeams = [
+            ["Team 1", "Team 5", "Team 8"],
+            ["Team 2", "Team 6", "Team 9"],
+            ["Team 3", "Team 7", "Team 10"]
+        ];
+
+        // Assign teams based on judge number (Example: Judge 1 → nextTeams[0], Judge 2 → nextTeams[1])
+        let judgeIndex = parseInt(selectedJudge) - 1;
+        let assignedTeams = nextTeams[judgeIndex % nextTeams.length];
+
+        // Display teams for scoring
+        teamsContainer.innerHTML = "";
+        assignedTeams.forEach(team => {
+            teamsContainer.innerHTML += `
+                <div class="team-container">
+                    <label for="score_${team}">${team}:</label>
+                    <input type="number" name="score_${team}" min="1" max="5" required>
+                </div>
+            `;
+        });
+
+        // Show the section with teams
+        teamScoresSection.style.display = "block";
+    }
+</script>
+
+</body>
+</html>
